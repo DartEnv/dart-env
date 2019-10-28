@@ -10,7 +10,7 @@ class HalfCheetahEnv(mujoco_env.MujocoEnv, utils.EzPickle):
 
         self.resample_MP = False  # whether to resample the model paraeters
         self.param_manager = mjcheetahParamManager(self)
-        self.velrew_weight = -1.0
+        self.velrew_weight = 1.0
 
         self.include_obs_history = 1
         self.include_act_history = 0
@@ -18,7 +18,7 @@ class HalfCheetahEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         # data structure for modeling delays in observation and action
         self.observation_buffer = []
         self.action_buffer = []
-        self.obs_delay = 0
+        self.obs_delay = 1
         self.act_delay = 0
         self.tilt_z = 0
 

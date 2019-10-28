@@ -24,8 +24,8 @@ class hopperContactMassManager:
         self.actuator_nonlin_range = [0.75, 1.5]
         self.reward_predictor = None
 
-        self.activated_param = [0,2]#[0,1, 2,3,4,5, 6,7,8, 9, 12,13,14,15]
-        self.controllable_param = [0,2]#[0,1, 2,3,4,5, 6,7,8, 9, 12,13,14,15]
+        self.activated_param = [0,1,2,5,9]#[0,1, 2,3,4,5, 6,7,8, 9, 12,13,14,15]
+        self.controllable_param = [0,1,2,5,9]#[0,1, 2,3,4,5, 6,7,8, 9, 12,13,14,15]
 
         self.binned_param = 0 # don't bin if = 0
 
@@ -1027,7 +1027,7 @@ class darwinParamManager:
         range(len(VARIATIONS)))
     MU_DIMS = np.array([5, 5, 5, 5, 5, 27, 1, 5, 1, 1, 1, 2, 1, 14, 26, 26, 52, 7, 7])
     MU_UP_BOUNDS = [[200, 200, 200, 200, 200], [1, 1, 1, 1, 1], [10, 10, 10, 10, 10], [3.0, 3.0, 3.0, 3.0, 3.0],
-                    [3.0, 3.0, 3.0, 3.0, 3.0], [1] * 27, [15], [1, 1, 1, 1, 1], [1], [1], [40.0], [0.1, 0.05], [3.0],
+                    [3.0, 3.0, 3.0, 3.0, 3.0], [1] * 27, [15], [1, 1, 1, 1, 1], [1], [1], [20.0], [0.1, 0.05], [3.0],
                     [1.5,  0.1, 0.1, 0.5, 0.1, 0.1,  0.1, 0.5, 0.5, 0.5, 0.1, 0.1, 0.5, 0.1], [1.3]*26, [1.6]*26,
                     [0.05]*52, [5.0]*7, [5.0]*7]
     MU_LOW_BOUNDS = [[0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [-1] * 27,
@@ -1036,7 +1036,8 @@ class darwinParamManager:
                      [-0.05]*52, [0.0]*7, [0.0]*7]
     activated_param = np.arange(14)
     #controllable_param = [KP_RATIO, KD_RATIO, NEURAL_MOTOR, VEL_LIM, JOINT_DAMPING, TORQUE_LIM, COM_OFFSET, GROUND_FRICTION]
-    controllable_param = [NEURAL_MOTOR, TORQUE_LIM, COM_OFFSET, GROUND_FRICTION, KP_RATIO_NEW, KD_RATIO_NEW]#, MASS_RATIO, INERTIA_RATIO]
+    # controllable_param = [NEURAL_MOTOR, TORQUE_LIM, COM_OFFSET, GROUND_FRICTION, KP_RATIO_NEW, KD_RATIO_NEW]#, MASS_RATIO, INERTIA_RATIO]
+    controllable_param = [KP_RATIO, KD_RATIO, NEURAL_MOTOR, TORQUE_LIM, COM_OFFSET, GROUND_FRICTION]
     MU_UNSCALED = None  # unscaled version of mu
 
     def __init__(self, simulator):
@@ -1308,7 +1309,8 @@ class darwinParamManager:
             current_id += self.MU_DIMS[self.COM_OFFSET]
 
         if self.GROUND_FRICTION in self.controllable_param:
-            self.simulator.dart_world.skeletons[0].bodynodes[0].set_friction_coeff(self.MU_UNSCALED[current_id])
+            for bn in self.simulator.dart_world.skeletons[0].bodynodes:
+                bn.set_friction_coeff(self.MU_UNSCALED[current_id])
             for bn in self.simulator.robot_skeleton.bodynodes:
                 bn.set_friction_coeff(self.MU_UNSCALED[current_id])
             current_id += self.MU_DIMS[self.GROUND_FRICTION]

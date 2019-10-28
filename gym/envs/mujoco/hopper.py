@@ -10,8 +10,11 @@ class HopperEnv(mujoco_env.MujocoEnv, utils.EzPickle):
 
         self.resample_MP = False  # whether to resample the model paraeters
         self.param_manager = mjHopperManager(self)
-        self.velrew_weight = -1.0
-        self.velrew_input = True
+        self.velrew_weight = 1
+        self.velrew_input = False
+        self.two_pose_input = False
+        self.previous_pose = np.zeros(5)
+        self.input_time = False
 
         self.terminate_for_not_moving = None#[0.5, 1.0]
 
@@ -107,7 +110,7 @@ class HopperEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         joint_limit_penalty = 0
         if np.abs(self.sim.data.qpos[-2]) < 0.05:
             joint_limit_penalty += 1.5
-        #reward -= 5e-1 * joint_limit_penalty
+        reward -= 5e-1 * joint_limit_penalty
         if self.use_sparse_reward:
             self.total_reward += reward
             reward = 0.0
@@ -121,6 +124,17 @@ class HopperEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         self.pre_advance()
         self.advance(a)
         self.post_advance()
+        #
+        # if self.cur_step > 200 and self.cur_step < 400:
+        #     self.model.geom_friction[-1][0] = 0.0
+        #     self.model.geom_friction[0][0] = 0.0
+        #     self.model.geom_friction[1][0] = 0.0
+        #     self.model.geom_friction[2][0] = 0.0
+        # else:
+        #     self.model.geom_friction[-1][0] = 2.0
+        #     self.model.geom_friction[0][0] = 2.0
+        #     self.model.geom_friction[1][0] = 2.0
+        #     self.model.geom_friction[2][0] = 2.0
 
         reward = self.reward_func(a)
 
@@ -134,11 +148,16 @@ class HopperEnv(mujoco_env.MujocoEnv, utils.EzPickle):
             self.sim.data.qpos.flat[1:],
             self.sim.data.qvel.flat
         ])
+
+        if self.two_pose_input:
+            state = np.concatenate([
+                self.sim.data.qpos.flat[1:],
+                (self.previous_pose - self.sim.data.qpos.flat[1:]) / self.dt
+            ])
+            self.previous_pose = self.sim.data.qpos.flat[1:]
+
         if self.train_UP:
             state = np.concatenate([state, self.param_manager.get_simulator_parameters()])
-
-        if self.velrew_input:
-            state = np.concatenate([state, [self.velrew_weight]])
 
         if self.noisy_input:
             state = state + np.random.normal(0, .01, len(state))
@@ -159,15 +178,21 @@ class HopperEnv(mujoco_env.MujocoEnv, utils.EzPickle):
             else:
                 final_obs = np.concatenate([final_obs, [0.0] * 3])
 
+        if self.velrew_input:
+            final_obs = np.concatenate([final_obs, [self.velrew_weight]])
+
+        if self.input_time:
+            final_obs = np.concatenate([final_obs, [self.cur_step * self.dt]])
+
         return final_obs
 
     def get_lowdim_obs(self):
         full_obs = self._get_obs(update_buffer=False)
-        return np.array([full_obs[1]])
+        return np.array([full_obs[5], full_obs[6]])
 
     def reset_model(self):
-        qpos = self.init_qpos + self.np_random.uniform(low=-.005, high=.005, size=self.model.nq)
-        qvel = self.init_qvel + self.np_random.uniform(low=-.005, high=.005, size=self.model.nv)
+        qpos = self.init_qpos# + self.np_random.uniform(low=-.005, high=.005, size=self.model.nq)
+        qvel = self.init_qvel# + self.np_random.uniform(low=-.005, high=.005, size=self.model.nv)
         self.set_state(qpos, qvel)
 
         self.observation_buffer = []
@@ -178,6 +203,8 @@ class HopperEnv(mujoco_env.MujocoEnv, utils.EzPickle):
 
         if self.resample_MP:
             self.param_manager.resample_parameters()
+
+        self.previous_pose = self.sim.data.qpos.flat[1:]
 
         return self._get_obs()
 

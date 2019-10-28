@@ -17,11 +17,12 @@ class DartWalker2dEnv(dart_env.DartEnv, utils.EzPickle):
         self.noisy_input = True
         self.resample_MP = False
         self.UP_noise_level = 0.0
+        self.input_time = False
         self.param_manager = walker2dParamManager(self)
 
-        self.diff_obs = True
+        self.diff_obs = False
 
-        self.terminate_for_not_moving = [0.5, 1.0]  # [distance, time], need to mvoe distance in time
+        self.terminate_for_not_moving = None #[0.5, 1.0]  # [distance, time], need to mvoe distance in time
 
         self.vibrating_ground = False
         self.ground_vib_params = [0.12,1.5] # magnitude, frequency
@@ -85,6 +86,10 @@ class DartWalker2dEnv(dart_env.DartEnv, utils.EzPickle):
 
         if self.diff_obs:
             obs_dim = obs_dim * obs_dim
+
+        if self.input_time:
+            obs_dim += 1
+
         dart_env.DartEnv.__init__(self, ['walker2d.skel', 'walker2d_variation1.skel'\
                                          , 'walker2d_variation2.skel'], 4, obs_dim, self.control_bounds, disableViewer=True)
 
@@ -322,6 +327,9 @@ class DartWalker2dEnv(dart_env.DartEnv, utils.EzPickle):
         if self.ground_vib_input:
             final_obs = np.concatenate([final_obs, self.ground_vib_params])
 
+        if self.input_time:
+            final_obs = np.concatenate([final_obs, [self.t]])
+
         if self.noisy_input:
             final_obs = final_obs + np.random.normal(0, .01, len(final_obs))
 
@@ -329,6 +337,7 @@ class DartWalker2dEnv(dart_env.DartEnv, utils.EzPickle):
             single_obs = np.copy(final_obs)
             for i in range(len(single_obs)-1):
                 final_obs = np.concatenate([final_obs, single_obs - np.roll(single_obs, i+1)])
+
 
         return final_obs
 

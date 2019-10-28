@@ -18,8 +18,9 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         self.train_UP = False
         self.velrew_input = False
         self.noisy_input = False
-        self.randomize_initial_state = False
+        self.randomize_initial_state = True
         self.input_time = False
+        self.two_pose_input = False  # whether to use two q's instead of q and dq
 
         self.pid_controller = None#[250, 25]
         if self.pid_controller is not None:
@@ -48,6 +49,10 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         self.action_filter_inobs = False  # whether to add the previous actions to the observations
 
         obs_dim = 11
+
+        if self.two_pose_input:
+            self.pose_history = []
+            obs_dim = 10
 
         self.obs_projection_model = None
 
@@ -78,7 +83,7 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         self.energy_penalty = 1e-3
 
         self.UP_noise_level = 0.0
-        self.resample_MP = False  # whether to resample the model paraeters
+        self.resample_MP = True  # whether to resample the model paraeters
 
         self.actuator_nonlinearity = False
         self.actuator_nonlin_coef = 1.0
@@ -87,9 +92,6 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
 
         if self.train_UP:
             obs_dim += len(self.param_manager.activated_param)
-
-        if self.velrew_input:
-            obs_dim += 1
 
         if self.action_filtering > 0 and self.action_filter_inobs:
             obs_dim += len(self.action_scale) * self.action_filtering
@@ -110,6 +112,9 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         self.include_act_history = 0
         obs_dim *= self.include_obs_history
         obs_dim += len(self.control_bounds[0]) * self.include_act_history
+
+        if self.velrew_input:
+            obs_dim += 1
 
         if self.input_time:
             obs_dim += 1
@@ -462,6 +467,15 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         # state = np.array(self.robot_skeleton.q[1:])
         state[0] = self.robot_skeleton.bodynodes[2].com()[1]
 
+        if self.two_pose_input:
+            self.pose_history.append(np.copy(self.robot_skeleton.q))
+            state = np.concatenate([
+                self.pose_history[-1][1:],
+                self.pose_history[-2][1:] - self.pose_history[-1][1:],
+            ])
+            state[0] = self.robot_skeleton.bodynodes[2].com()[1]
+            state[5] = self.robot_skeleton.bodynodes[2].com()[1]
+
         if self.action_filtering > 0 and self.action_filter_inobs:
             state = np.concatenate([state] + self.action_filter_cache)
 
@@ -476,9 +490,6 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
                 UP += np.random.uniform(-self.UP_noise_level, self.UP_noise_level, len(UP))
                 UP = np.clip(UP, -0.05, 1.05)
             state = np.concatenate([state, UP])
-
-        if self.velrew_input:
-            state = np.concatenate([state, [self.velrew_weight]])
 
         if self.input_time:
             state = np.concatenate([state, [self.t]])
@@ -522,6 +533,9 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         if self.obs_projection_model:
             final_obs = self.obs_projection_model(final_obs)
 
+        if self.velrew_input:
+            final_obs = np.concatenate([final_obs, [self.velrew_weight]])
+
         return final_obs
 
     def get_lowdim_obs(self):
@@ -541,7 +555,7 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
 
         if self.resample_MP:
             self.param_manager.resample_parameters()
-            self.current_param = self.param_manager.get_simulator_parameters()
+        self.current_param = self.param_manager.get_simulator_parameters()
 
         self.observation_buffer = []
         self.action_buffer = []
@@ -550,6 +564,9 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         if self.action_filtering > 0:
             for i in range(self.action_filtering):
                 self.action_filter_cache.append(np.zeros(len(self.action_scale)))
+
+        if self.two_pose_input:
+            self.pose_history = [np.copy(self.robot_skeleton.q)]
 
         state = self._get_obs(update_buffer = True)
 
