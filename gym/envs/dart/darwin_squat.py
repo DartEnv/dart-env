@@ -40,7 +40,7 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
             self.last_root = [0, 0, 0]
         self.fallstate_input = False
 
-        self.adjustable_leg_compliance = False
+        self.adjustable_leg_compliance = True
 
         self.variation_scheduling = [[0.0, {'obstacle_height_range': 0.0}], [4.5, {'obstacle_height_range': 0.02}]]
 
@@ -1372,3 +1372,5 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
     def advance_curriculum(self):
         self.variation_scheduling[0][1]['obstacle_height_range'] = self.variation_scheduling[1][1]['obstacle_height_range']
         self.variation_scheduling[1][1]['obstacle_height_range'] += 0.02
+        if self.variation_scheduling[1][1]['obstacle_height_range'] > 0.15:
+            self.variation_scheduling[1][1]['obstacle_height_range'] -= 0.02
