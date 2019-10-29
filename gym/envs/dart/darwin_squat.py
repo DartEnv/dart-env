@@ -103,7 +103,7 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
         self.orientation_threshold = 1.0    # terminate if body rotates for this amount
         self.control_interval = 0.03  # control every 50 ms
         self.sim_timestep = 0.002
-        self.forward_reward = 10.0
+        self.forward_reward = 15.0
         self.velocity_clip = 0.3
         self.contact_pen = 0.0
         self.kp = None
@@ -158,7 +158,7 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
 
         self.delta_angle_scale = 0.3
 
-        self.alive_bonus = 5.0
+        self.alive_bonus = 3.0
         self.energy_weight = 0.01
         self.work_weight = 0.005
         self.pose_weight = 0.2
@@ -946,10 +946,13 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
                         self.current_assist = sch[1]
 
         if self.use_discrete_action:
+            # a = a * 1.0 / np.floor(self.action_space.nvec / 2.0) - 1.0
+            new_a = np.zeros(len(a))
             odd_nvec_ids = self.action_space.nvec % 2 == 1
             even_nvec_ids = self.action_space.nvec % 2 == 0
-            a[odd_nvec_ids] = a[odd_nvec_ids] * 1.0/ np.floor(self.action_space.nvec[odd_nvec_ids]/2.0) - 1.0
-            a[even_nvec_ids] = a[even_nvec_ids] * 1.0 / (np.floor(self.action_space.nvec[even_nvec_ids] / 2.0)-0.5) - 1.0
+            new_a[odd_nvec_ids] = a[odd_nvec_ids] * 1.0/ np.floor(self.action_space.nvec[odd_nvec_ids]/2.0) - 1.0
+            new_a[even_nvec_ids] = a[even_nvec_ids] * 1.0 / (np.floor(self.action_space.nvec[even_nvec_ids] / 2.0)-0.5) - 1.0
+            a = new_a
 
         if not self.butterworth_filter:
             self.action_filter_cache.append(a)
@@ -1067,10 +1070,10 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
 
         # move the obstacle forward when the robot has passed it
         if self.randomize_obstacle and not self.soft_ground and not self.supress_all_randomness:
-            horizontal_range = [-0.03, 0.0]
-            vertical_range = [-1.36, -1.376]
+            horizontal_range = [-0.0, 0.0]
+            vertical_range = [-1.358, -1.378]
             for obid in range(1, len(self.obstacle_bodynodes)):
-                if self.robot_skeleton.C[0] - 0.4 > self.obstacle_bodynodes[obid].shapenodes[0].offset()[0]:
+                if self.robot_skeleton.C[0] - 0.35 > self.obstacle_bodynodes[obid].shapenodes[0].offset()[0]:
                     last_ob_id = (obid-1 + len(self.obstacle_bodynodes)-2) % (len(self.obstacle_bodynodes)-1)+1
                     last_ob_pos = self.obstacle_bodynodes[last_ob_id].shapenodes[0].offset()[0]
                     offset = np.copy(self.obstacle_bodynodes[obid].shapenodes[0].offset())
@@ -1078,7 +1081,7 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
                     sampled_v = np.random.uniform(vertical_range[0], vertical_range[1])
                     sampled_h = np.random.uniform(horizontal_range[0], horizontal_range[1])
 
-                    offset[0] = last_ob_pos + 0.2 + sampled_h
+                    offset[0] = last_ob_pos + 0.1 + sampled_h
                     offset[2] = sampled_v
 
                     self.obstacle_bodynodes[obid].shapenodes[0].set_offset(offset)
@@ -1274,11 +1277,11 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
             self.action_filter_cache.append(np.zeros(self.act_dim))
 
         if self.randomize_obstacle and not self.soft_ground:
-            horizontal_range = [-0.03, 0.0]
-            vertical_range = [-1.36, -1.376]
+            horizontal_range = [-0.0, 0.0]
+            vertical_range = [-1.358, -1.378]
             for obid in range(1, len(self.obstacle_bodynodes)):
                 sampled_v = np.random.uniform(vertical_range[0], vertical_range[1])
-                sampled_h = np.random.uniform(horizontal_range[0], horizontal_range[1]) + 0.1 + 0.2 * obid
+                sampled_h = np.random.uniform(horizontal_range[0], horizontal_range[1]) + 0.05 + 0.1 * obid
                 self.obstacle_bodynodes[obid].shapenodes[0].set_offset([sampled_h, 0, sampled_v])
                 self.obstacle_bodynodes[obid].shapenodes[1].set_offset([sampled_h, 0, sampled_v])
 

@@ -38,7 +38,7 @@
         <visual>
             <origin xyz="0.0 0 -1.368" rpy="0 0 0" />
             <geometry>
-                <box size="0.4 25 2.05" />
+                <box size="0.2 25 2.05" />
             </geometry>
             <material name="G">
                 <color rgba ="0.0 1.0 1.0 1.0"/>
@@ -47,7 +47,7 @@
         <collision group="default">
             <origin xyz="0.0 0 -1.368"  rpy="0 0 0"/>
             <geometry>
-                <box size="0.4 25 2.05" />
+                <box size="0.2 25 2.05" />
             </geometry>
         </collision>
     </link>
@@ -64,18 +64,18 @@
             <inertia ixx="1.0" ixy="0" ixz="0" iyy="1.0" iyz="0" izz="1.0" />
         </inertial>
         <visual>
-            <origin xyz="0.3 0 -1.368" rpy="0 0 0" />
+            <origin xyz="0.15 0 -1.368" rpy="0 0 0" />
             <geometry>
-                <box size="0.2 25 2.05" />
+                <box size="0.1 25 2.05" />
             </geometry>
             <material name="Y">
                 <color rgba ="1.0 1.0 0.0 1.0"/>
             </material>
         </visual>
         <collision group="default">
-            <origin xyz="0.3 0 -1.368"  rpy="0 0 0"/>
+            <origin xyz="0.15 0 -1.368"  rpy="0 0 0"/>
             <geometry>
-                <box size="0.2 25 2.05" />
+                <box size="0.1 25 2.05" />
             </geometry>
         </collision>
     </link>
@@ -94,7 +94,7 @@
         <visual>
             <origin xyz="0.5 0 -1.368" rpy="0 0 0" />
             <geometry>
-                <box size="0.2 25 2.05" />
+                <box size="0.1 25 2.05" />
             </geometry>
             <material name="B">
                 <color rgba ="0.0 0.0 1.0 1.0"/>
@@ -103,7 +103,7 @@
         <collision group="default">
             <origin xyz="0.5 0 -1.368"  rpy="0 0 0"/>
             <geometry>
-                <box size="0.2 25 2.05" />
+                <box size="0.1 25 2.05" />
             </geometry>
         </collision>
     </link>
@@ -122,7 +122,7 @@
         <visual>
             <origin xyz="0.7 0 -1.368" rpy="0 0 0" />
             <geometry>
-                <box size="0.2 25 2.05" />
+                <box size="0.1 25 2.05" />
             </geometry>
             <material name="C">
                 <color rgba ="1.0 0.0 1.0 1.0"/>
@@ -131,7 +131,7 @@
         <collision group="default">
             <origin xyz="0.7 0 -1.368"  rpy="0 0 0"/>
             <geometry>
-                <box size="0.2 25 2.05" />
+                <box size="0.1 25 2.05" />
             </geometry>
         </collision>
     </link>
@@ -151,7 +151,7 @@
         <visual>
             <origin xyz="0.9 0 -1.368" rpy="0 0 0" />
             <geometry>
-                <box size="0.2 25 2.05" />
+                <box size="0.1 25 2.05" />
             </geometry>
             <material name="R">
                 <color rgba ="1.0 0.0 0.0 1.0"/>
@@ -160,7 +160,7 @@
         <collision group="default">
             <origin xyz="0.9 0 -1.368"  rpy="0 0 0"/>
             <geometry>
-                <box size="0.2 25 2.05" />
+                <box size="0.1 25 2.05" />
             </geometry>
         </collision>
     </link>
@@ -168,6 +168,62 @@
         <origin xyz="0 0 0" rpy="0 0 0" />
         <parent link="ground_link" />
         <child link="obstacle5" />
+    </joint>
+
+    <link name="obstacle6">
+        <inertial>
+            <mass value="1.0" />
+            <origin xyz="0 0 -1.368" rpy="0 0 0"/>
+            <inertia ixx="1.0" ixy="0" ixz="0" iyy="1.0" iyz="0" izz="1.0" />
+        </inertial>
+        <visual>
+            <origin xyz="0.9 0 -1.368" rpy="0 0 0" />
+            <geometry>
+                <box size="0.1 25 2.05" />
+            </geometry>
+            <material name="GR">
+                <color rgba ="0.4 0.4 0.4 1.0"/>
+            </material>
+        </visual>
+        <collision group="default">
+            <origin xyz="0.9 0 -1.368"  rpy="0 0 0"/>
+            <geometry>
+                <box size="0.1 25 2.05" />
+            </geometry>
+        </collision>
+    </link>
+    <joint name="obstacle_joint6" type="fixed">
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <parent link="ground_link" />
+        <child link="obstacle6" />
+    </joint>
+
+    <link name="obstacle7">
+        <inertial>
+            <mass value="1.0" />
+            <origin xyz="0 0 -1.368" rpy="0 0 0"/>
+            <inertia ixx="1.0" ixy="0" ixz="0" iyy="1.0" iyz="0" izz="1.0" />
+        </inertial>
+        <visual>
+            <origin xyz="0.9 0 -1.368" rpy="0 0 0" />
+            <geometry>
+                <box size="0.1 25 2.05" />
+            </geometry>
+            <material name="G">
+                <color rgba ="0.0 1.0 0.0 1.0"/>
+            </material>
+        </visual>
+        <collision group="default">
+            <origin xyz="0.9 0 -1.368"  rpy="0 0 0"/>
+            <geometry>
+                <box size="0.1 25 2.05" />
+            </geometry>
+        </collision>
+    </link>
+    <joint name="obstacle_joint7" type="fixed">
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <parent link="ground_link" />
+        <child link="obstacle7" />
     </joint>
 
     <link name="wall">
