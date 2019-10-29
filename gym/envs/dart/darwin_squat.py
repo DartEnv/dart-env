@@ -40,6 +40,8 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
             self.last_root = [0, 0, 0]
         self.fallstate_input = False
 
+        self.adjustable_leg_compliance = False
+
         self.gyro_only_mode = False
         self.leg_only_observation = True   # only read the leg motor states
 
@@ -138,7 +140,10 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
         if self.task_mode == self.BONGOBOARD: # add observation about board
             obs_dim += 3
 
-        self.control_bounds = np.array([-np.ones(20, ), np.ones(20, )])
+        self.act_dim = 20
+        if self.adjustable_leg_compliance:
+            self.act_dim += 2  # one for each ankle
+        self.control_bounds = np.array([-np.ones(self.act_dim, ), np.ones(self.act_dim, )])
 
         self.observation_buffer = []
         self.obs_delay = 0
@@ -188,6 +193,8 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
             obs_perm_base = np.array([])
         act_perm_base = np.array(
             [-3, -4, -5, -0.0001, -1, -2, -6, 7, -14, -15, -16, -17, -18, -19, -8, -9, -10, -11, -12, -13])
+        if self.adjustable_leg_compliance:
+            act_perm_base = np.concatenate([act_perm_base, [len(act_perm_base)+1, len(act_perm_base)]])
         self.obs_perm = np.copy(obs_perm_base)
 
         if self.root_input:
@@ -221,7 +228,10 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
 
         if self.use_discrete_action:
             from gym import spaces
-            self.action_space = spaces.MultiDiscrete([11] * 20)
+            disc_nvec = [11] * 20
+            if self.adjustable_leg_compliance:
+                disc_nvec += [2] * 2
+            self.action_space = spaces.MultiDiscrete(disc_nvec)
             #self.action_space = spaces.MultiDiscrete([5,5,5,5,5,5, 3,3, 7,7,7,7,7,7, 7,7,7,7,7,7])
 
         model_file_list = ['darwinmodel/ground1.urdf', 'darwinmodel/darwin_nocollision.URDF', 'darwinmodel/coord.urdf', 'darwinmodel/tracking_box.urdf', 'darwinmodel/bongo_board.urdf', 'darwinmodel/robotis_op2.urdf']
@@ -707,7 +717,6 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
 
         if self.paused and self.t > 0:
             return
-
         clamped_control = np.array(a)
 
         if self.butterworth_filter:
@@ -718,6 +727,20 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
                 clamped_control[i] = self.control_bounds[1][i]
             if clamped_control[i] < self.control_bounds[0][i]:
                 clamped_control[i] = self.control_bounds[0][i]
+
+        if self.adjustable_leg_compliance:
+            self.left_leg_compliance = clamped_control[-2]
+            self.right_leg_compliance = clamped_control[-1]
+            clamped_control = clamped_control[0:-2]
+            if self.left_leg_compliance > 0.0:
+                self.robot_skeleton.bodynodes[5].shapenodes[0].set_visual_aspect_rgba([0.5, 0.5, 1.0, 1.0])
+            else:
+                self.robot_skeleton.bodynodes[5].shapenodes[0].set_visual_aspect_rgba([1.0, 0.0, 0.0, 1.0])
+
+            if self.right_leg_compliance > 0.0:
+                self.robot_skeleton.bodynodes[10].shapenodes[0].set_visual_aspect_rgba([0.5, 0.5, 1.0, 1.0])
+            else:
+                self.robot_skeleton.bodynodes[10].shapenodes[0].set_visual_aspect_rgba([1.0, 0.0, 0.0, 1.0])
 
         self.ref_target = self.get_ref_pose(self.t)
 
@@ -819,13 +842,18 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
 
             if len(self.kp_ratios) == 5:
                 kp[0:6] *= self.kp_ratios[0]
-                kp[7:8] *= self.kp_ratios[1]
+                kp[6:8] *= self.kp_ratios[1]
                 kp[8:11] *= self.kp_ratios[2]
                 kp[14:17] *= self.kp_ratios[2]
                 kp[11] *= self.kp_ratios[3]
                 kp[17] *= self.kp_ratios[3]
                 kp[12:14] *= self.kp_ratios[4]
                 kp[18:20] *= self.kp_ratios[4]
+                if self.adjustable_leg_compliance:
+                    if self.left_leg_compliance < 0.0:
+                        kp[12:14] *= 0.1
+                    if self.right_leg_compliance < 0.0:
+                        kp[18:20] *= 0.1
 
             if len(self.kp_ratios) == 10:
                 kp[[0, 1, 2, 6, 8,9,10,11,12,13]] *= self.kp_ratios
@@ -848,7 +876,7 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
 
             if len(self.kd_ratios) == 5:
                 kd[0:6] *= self.kd_ratios[0]
-                kd[7:8] *= self.kd_ratios[1]
+                kd[6:8] *= self.kd_ratios[1]
                 kd[8:11] *= self.kd_ratios[2]
                 kd[14:17] *= self.kd_ratios[2]
                 kd[11] *= self.kd_ratios[3]
@@ -918,7 +946,10 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
                         self.current_assist = sch[1]
 
         if self.use_discrete_action:
-            a = a * 1.0/ np.floor(self.action_space.nvec/2.0) - 1.0
+            odd_nvec_ids = self.action_space.nvec % 2 == 1
+            even_nvec_ids = self.action_space.nvec % 2 == 0
+            a[odd_nvec_ids] = a[odd_nvec_ids] * 1.0/ np.floor(self.action_space.nvec[odd_nvec_ids]/2.0) - 1.0
+            a[even_nvec_ids] = a[even_nvec_ids] * 1.0 / (np.floor(self.action_space.nvec[even_nvec_ids] / 2.0)-0.5) - 1.0
 
         if not self.butterworth_filter:
             self.action_filter_cache.append(a)
@@ -1240,7 +1271,7 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
 
         self.action_filter_cache = []
         for i in range(self.action_filtering):
-            self.action_filter_cache.append(np.zeros(20))
+            self.action_filter_cache.append(np.zeros(self.act_dim))
 
         if self.randomize_obstacle and not self.soft_ground:
             horizontal_range = [-0.03, 0.0]
