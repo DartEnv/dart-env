@@ -42,6 +42,8 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
 
         self.adjustable_leg_compliance = False
 
+        self.input_leg_tracking_error = True
+
         self.variation_scheduling = None#[[0.0, {'obstacle_height_range': 0.0}], [4.5, {'obstacle_height_range': 0.001}]]
 
         self.gyro_only_mode = False
@@ -142,6 +144,9 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
         if self.task_mode == self.BONGOBOARD: # add observation about board
             obs_dim += 3
 
+        if self.input_leg_tracking_error:
+            obs_dim += 12
+
         self.act_dim = 20
         if self.adjustable_leg_compliance:
             self.act_dim += 2  # one for each ankle
@@ -214,6 +219,14 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
         if self.task_mode == self.BONGOBOARD:
             beginid = len(obs_perm_base)
             obs_perm_base = np.concatenate([obs_perm_base, [-beginid-0.0001, beginid + 1, -beginid - 2]])
+
+        if self.input_leg_tracking_error:
+            # Input the tracking errors for the leg dofs
+            beginid = len(obs_perm_base)
+            obs_perm_base = np.concatenate([obs_perm_base, [-beginid-6, -beginid -7, -beginid - 8,
+                   -beginid-9, -beginid -10, -beginid - 11, -beginid, -beginid-1, -beginid-2,
+                   -beginid-3, -beginid-4, -beginid-5]])
+
         if self.train_UP:
             obs_perm_base = np.concatenate([obs_perm_base, np.arange(len(obs_perm_base), len(obs_perm_base) + len(
                 self.param_manager.activated_param))])
@@ -1173,6 +1186,11 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
         if self.task_mode == self.BONGOBOARD:
             board_ori = np.array(euler_from_matrix(self.dart_world.skeletons[4].bodynode('board').T[0:3, 0:3], 'sxyz'))
             state = np.concatenate([state, board_ori])
+
+        if self.input_leg_tracking_error:
+            cur_leg_pose = np.array(self.robot_skeleton.q)[self.observed_dof_ids]
+            target_leg_pose = self.target_pose[np.array(self.observed_dof_ids)-6]
+            state = np.concatenate([state, cur_leg_pose - target_leg_pose])
 
         if self.train_UP:
             #UP = self.param_manager.get_simulator_parameters()
