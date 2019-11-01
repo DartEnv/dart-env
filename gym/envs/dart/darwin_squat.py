@@ -1189,7 +1189,7 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
 
         if self.input_leg_tracking_error:
             cur_leg_pose = np.array(self.robot_skeleton.q)[self.observed_dof_ids]
-            target_leg_pose = self.target_pose[np.array(self.observed_dof_ids)-6]
+            target_leg_pose = self.target[np.array(self.observed_dof_ids)-6]
             state = np.concatenate([state, cur_leg_pose - target_leg_pose])
 
         if self.train_UP:
