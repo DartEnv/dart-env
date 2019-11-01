@@ -204,10 +204,10 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
  
         self.resample_MP = False
 
-        self.param_manager.resample_parameters()
+        # self.param_manager.resample_parameters()
         self.current_param = self.param_manager.get_simulator_parameters()
 
-        self.velrew_weight = np.random.choice([-1.0, -0.5, 0.5, 1.0])
+        self.velrew_weight = np.random.choice([-1.0, 1.0])
 
         obstacle_height = np.random.choice([0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8])
         self.obs_height = obstacle_height

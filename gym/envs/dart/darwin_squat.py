@@ -40,9 +40,9 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
             self.last_root = [0, 0, 0]
         self.fallstate_input = False
 
-        self.adjustable_leg_compliance = True
+        self.adjustable_leg_compliance = False
 
-        self.variation_scheduling = [[0.0, {'obstacle_height_range': 0.0}], [4.5, {'obstacle_height_range': 0.02}]]
+        self.variation_scheduling = None#[[0.0, {'obstacle_height_range': 0.0}], [4.5, {'obstacle_height_range': 0.001}]]
 
         self.gyro_only_mode = False
         self.leg_only_observation = True   # only read the leg motor states
@@ -89,9 +89,9 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
         self.use_settled_initial_states = False
         self.limited_joint_vel = True
         self.joint_vel_limit = 20000.0
-        self.train_UP = True
+        self.train_UP = False
         self.noisy_input = True
-        self.resample_MP = True
+        self.resample_MP = False
         self.range_robust = 0.25 # std to sample at each step
         self.randomize_timestep = True
         self.randomize_action_delay = True
@@ -105,7 +105,7 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
         self.orientation_threshold = 1.0    # terminate if body rotates for this amount
         self.control_interval = 0.03  # control every 50 ms
         self.sim_timestep = 0.002
-        self.forward_reward = 15.0
+        self.forward_reward = 10.0
         self.velocity_clip = 0.3
         self.contact_pen = 0.0
         self.kp = None
@@ -160,7 +160,7 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
 
         self.delta_angle_scale = 0.3
 
-        self.alive_bonus = 3.0
+        self.alive_bonus = 5.0
         self.energy_weight = 0.01
         self.work_weight = 0.005
         self.pose_weight = 0.2
@@ -273,9 +273,11 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
             self.left_shoe_dofs = [df for df in self.robot_skeleton.dofs if 'shoe' in df.name and '_l' in df.name]
             self.right_shoe_dofs = [df for df in self.robot_skeleton.dofs if 'shoe' in df.name and '_r' in df.name]
             for df in self.left_shoe_dofs:
-                df.set_spring_stiffness(300)
+                df.set_spring_stiffness(3000)
+                df.set_damping_coefficient(5)
             for df in self.right_shoe_dofs:
-                df.set_spring_stiffness(300)
+                df.set_spring_stiffness(3000)
+                df.set_damping_coefficient(5)
 
         # crawl
         if self.task_mode == self.CRAWL:
@@ -1068,11 +1070,14 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
         if self.t > self.interp_sch[-1][0] + 2:
             done = True
 
+        if self.robot_skeleton.C[0] < 0.15 and self.t > 2.0:
+            done = True
+
         ob = self._get_obs()
 
         # move the obstacle forward when the robot has passed it
+        horizontal_range = [-0.0, 0.0]
         if self.randomize_obstacle and not self.soft_ground and not self.supress_all_randomness:
-            horizontal_range = [-0.0, 0.0]
             vertical_range = [-1.358, -1.378]
             if self.variation_scheduling is not None and 'obstacle_height_range' in self.variation_scheduling[0][1]:
                 height_var = self.variation_scheduling[0][1]['obstacle_height_range']
@@ -1080,20 +1085,22 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
                     if self.t > self.variation_scheduling[sch_id][0]:
                         height_var = self.variation_scheduling[sch_id][1]['obstacle_height_range']
                 vertical_range = [-1.368 - height_var, -1.368 + height_var]
-            for obid in range(1, len(self.obstacle_bodynodes)):
-                if self.robot_skeleton.C[0] - 0.35 > self.obstacle_bodynodes[obid].shapenodes[0].offset()[0]:
-                    last_ob_id = (obid-1 + len(self.obstacle_bodynodes)-2) % (len(self.obstacle_bodynodes)-1)+1
-                    last_ob_pos = self.obstacle_bodynodes[last_ob_id].shapenodes[0].offset()[0]
-                    offset = np.copy(self.obstacle_bodynodes[obid].shapenodes[0].offset())
+        else:
+            vertical_range = [-1.368, -1.368]
+        for obid in range(1, len(self.obstacle_bodynodes)):
+            if self.robot_skeleton.C[0] - 0.35 > self.obstacle_bodynodes[obid].shapenodes[0].offset()[0]:
+                last_ob_id = (obid-1 + len(self.obstacle_bodynodes)-2) % (len(self.obstacle_bodynodes)-1)+1
+                last_ob_pos = self.obstacle_bodynodes[last_ob_id].shapenodes[0].offset()[0]
+                offset = np.copy(self.obstacle_bodynodes[obid].shapenodes[0].offset())
 
-                    sampled_v = np.random.uniform(vertical_range[0], vertical_range[1])
-                    sampled_h = np.random.uniform(horizontal_range[0], horizontal_range[1])
+                sampled_v = np.random.uniform(vertical_range[0], vertical_range[1])
+                sampled_h = np.random.uniform(horizontal_range[0], horizontal_range[1])
 
-                    offset[0] = last_ob_pos + 0.1 + sampled_h
-                    offset[2] = sampled_v
+                offset[0] = last_ob_pos + 0.1 + sampled_h
+                offset[2] = sampled_v
 
-                    self.obstacle_bodynodes[obid].shapenodes[0].set_offset(offset)
-                    self.obstacle_bodynodes[obid].shapenodes[1].set_offset(offset)
+                self.obstacle_bodynodes[obid].shapenodes[0].set_offset(offset)
+                self.obstacle_bodynodes[obid].shapenodes[1].set_offset(offset)
 
         #if self.range_robust > 0:
         #    rand_param = np.clip(self.current_param + np.random.normal(0, self.range_robust, len(self.current_param)), -0.05, 1.05)
@@ -1289,16 +1296,18 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
         for i in range(self.action_filtering):
             self.action_filter_cache.append(np.zeros(self.act_dim))
 
-        if self.randomize_obstacle and not self.soft_ground:
-            horizontal_range = [-0.0, 0.0]
+        horizontal_range = [-0.0, 0.0]
+        if self.randomize_obstacle and not self.soft_ground and not self.supress_all_randomness:
             vertical_range = [-1.358, -1.378]
             if self.variation_scheduling is not None and 'obstacle_height_range' in self.variation_scheduling[0][1]:
                 vertical_range = [-1.368 - self.variation_scheduling[0][1]['obstacle_height_range'], -1.368 + self.variation_scheduling[0][1]['obstacle_height_range']]
-            for obid in range(1, len(self.obstacle_bodynodes)):
-                sampled_v = np.random.uniform(vertical_range[0], vertical_range[1])
-                sampled_h = np.random.uniform(horizontal_range[0], horizontal_range[1]) + 0.05 + 0.1 * obid
-                self.obstacle_bodynodes[obid].shapenodes[0].set_offset([sampled_h, 0, sampled_v])
-                self.obstacle_bodynodes[obid].shapenodes[1].set_offset([sampled_h, 0, sampled_v])
+        else:
+            vertical_range = [-1.368, -1.368]
+        for obid in range(1, len(self.obstacle_bodynodes)):
+            sampled_v = np.random.uniform(vertical_range[0], vertical_range[1])
+            sampled_h = np.random.uniform(horizontal_range[0], horizontal_range[1]) + 0.05 + 0.1 * obid
+            self.obstacle_bodynodes[obid].shapenodes[0].set_offset([sampled_h, 0, sampled_v])
+            self.obstacle_bodynodes[obid].shapenodes[1].set_offset([sampled_h, 0, sampled_v])
 
         if self.randomize_gyro_bias and not self.supress_all_randomness:
             self.gyro_bias = np.random.uniform(-0.1, 0.1, 2)
@@ -1371,6 +1380,6 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
 
     def advance_curriculum(self):
         self.variation_scheduling[0][1]['obstacle_height_range'] = self.variation_scheduling[1][1]['obstacle_height_range']
-        self.variation_scheduling[1][1]['obstacle_height_range'] += 0.02
-        if self.variation_scheduling[1][1]['obstacle_height_range'] > 0.15:
-            self.variation_scheduling[1][1]['obstacle_height_range'] -= 0.02
+        self.variation_scheduling[1][1]['obstacle_height_range'] += 0.001
+        if self.variation_scheduling[1][1]['obstacle_height_range'] > 0.014:
+            self.variation_scheduling[1][1]['obstacle_height_range'] -= 0.001
