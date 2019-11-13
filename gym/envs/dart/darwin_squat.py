@@ -44,7 +44,10 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
 
         self.input_leg_tracking_error = True
 
-        self.variation_scheduling = None#[[0.0, {'obstacle_height_range': 0.0}], [4.5, {'obstacle_height_range': 0.001}]]
+        self.input_contact_bin = True
+        self.num_contact_bin = 4
+
+        self.variation_scheduling = [[0.0, {'obstacle_height_range': 0.0}], [4.5, {'obstacle_height_range': 0.001}]]
 
         self.gyro_only_mode = False
         self.leg_only_observation = True   # only read the leg motor states
@@ -68,7 +71,7 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
         self.kp_ratios = [1.0, 1.0, 1.0, 1.0, 1.0]
         self.kd_ratios = [1.0, 1.0, 1.0, 1.0, 1.0]
 
-        self.use_discrete_action = True
+        self.use_discrete_action = False
 
         self.use_sysid_model = True
 
@@ -146,6 +149,9 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
 
         if self.input_leg_tracking_error:
             obs_dim += 12
+
+        if self.input_contact_bin:
+            obs_dim += 2 * self.num_contact_bin
 
         self.act_dim = 20
         if self.adjustable_leg_compliance:
@@ -226,6 +232,15 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
             obs_perm_base = np.concatenate([obs_perm_base, [-beginid-6, -beginid -7, -beginid - 8,
                    -beginid-9, -beginid -10, -beginid - 11, -beginid, -beginid-1, -beginid-2,
                    -beginid-3, -beginid-4, -beginid-5]])
+
+        if self.input_contact_bin:
+            beginid = len(obs_perm_base)
+            contact_bin_perm = []
+            for i in range(self.num_contact_bin):
+                contact_bin_perm.append(beginid+i+self.num_contact_bin)
+            for i in range(self.num_contact_bin):
+                contact_bin_perm.append(beginid+i)
+            obs_perm_base = np.concatenate([obs_perm_base, contact_bin_perm])
 
         if self.train_UP:
             obs_perm_base = np.concatenate([obs_perm_base, np.arange(len(obs_perm_base), len(obs_perm_base) + len(
@@ -1174,6 +1189,10 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
                     gyro[0:2] += self.gyro_bias
                 self.last_root = [gyro[0], gyro[1], adjusted_heading]
             state = np.concatenate([state, gyro])
+
+        if self.noisy_input and not self.supress_all_randomness:
+            state = state + np.random.normal(0, .01, len(state))
+            
         if self.fallstate_input:
             state = np.concatenate([state, self.falling_state()])
 
@@ -1192,12 +1211,36 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
             target_leg_pose = self.target[np.array(self.observed_dof_ids)-6]
             state = np.concatenate([state, cur_leg_pose - target_leg_pose])
 
+        if self.input_contact_bin:
+            foot_length = self.body_parts[-7].shapenodes[1].shape.size()[2]
+            left_foot_com = self.body_parts[-7].shapenodes[1].offset()
+            right_foot_com = self.body_parts[-1].shapenodes[1].offset()
+            contacts = self.dart_world.collision_result.contacts
+            left_foot_contact_bin = np.zeros(self.num_contact_bin)
+            right_foot_contact_bin = np.zeros(self.num_contact_bin)
+
+            left_foot_contacts = []
+            right_foot_contacts = []
+            for contact in contacts:
+                if contact.skel_id1 != self.robot_skeleton.id and contact.skel_id2 != self.robot_skeleton.id:
+                    continue
+                if contact.bodynode1 == self.body_parts[-7]:
+                    left_foot_contacts.append(contact)
+                if contact.bodynode1 == self.body_parts[-1]:
+                    right_foot_contacts.append(contact)
+            for contact in left_foot_contacts:
+                local_pos = self.body_parts[-7].to_local(contact.point)
+                cbinid = int((local_pos[2] - (left_foot_com[2] - 0.5 * foot_length)) / (foot_length / self.num_contact_bin + 0.001))
+                left_foot_contact_bin[cbinid] = 1.0
+            for contact in right_foot_contacts:
+                local_pos = self.body_parts[-1].to_local(contact.point)
+                cbinid = int((local_pos[2] - (right_foot_com[2] - 0.5 * foot_length)) / (foot_length / self.num_contact_bin + 0.001))
+                right_foot_contact_bin[cbinid] = 1.0
+            state = np.concatenate([state, left_foot_contact_bin, right_foot_contact_bin])
+
         if self.train_UP:
             #UP = self.param_manager.get_simulator_parameters()
             state = np.concatenate([state, self.current_param])
-
-        if self.noisy_input and not self.supress_all_randomness:
-            state = state + np.random.normal(0, .01, len(state))
 
         if update_buffer:
             self.observation_buffer.append(np.copy(state))
@@ -1399,5 +1442,8 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
     def advance_curriculum(self):
         self.variation_scheduling[0][1]['obstacle_height_range'] = self.variation_scheduling[1][1]['obstacle_height_range']
         self.variation_scheduling[1][1]['obstacle_height_range'] += 0.001
-        if self.variation_scheduling[1][1]['obstacle_height_range'] > 0.014:
+        if self.variation_scheduling[1][1]['obstacle_height_range'] > 0.01:
             self.variation_scheduling[1][1]['obstacle_height_range'] -= 0.001
+
+    def get_curriculum(self):
+        return self.variation_scheduling[0][1]['obstacle_height_range']
