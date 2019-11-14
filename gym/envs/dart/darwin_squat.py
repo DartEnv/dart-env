@@ -1192,7 +1192,6 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
 
         if self.noisy_input and not self.supress_all_randomness:
             state = state + np.random.normal(0, .01, len(state))
-            
         if self.fallstate_input:
             state = np.concatenate([state, self.falling_state()])
 
@@ -1224,9 +1223,9 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
             for contact in contacts:
                 if contact.skel_id1 != self.robot_skeleton.id and contact.skel_id2 != self.robot_skeleton.id:
                     continue
-                if contact.bodynode1 == self.body_parts[-7]:
+                if contact.bodynode1 == self.body_parts[-7] or contact.bodynode2 == self.body_parts[-7]:
                     left_foot_contacts.append(contact)
-                if contact.bodynode1 == self.body_parts[-1]:
+                if contact.bodynode1 == self.body_parts[-1] or contact.bodynode2 == self.body_parts[-1]:
                     right_foot_contacts.append(contact)
             for contact in left_foot_contacts:
                 local_pos = self.body_parts[-7].to_local(contact.point)
