@@ -76,14 +76,15 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         self.learnable_perturbation_space = spaces.Box(np.array([-1] * len(self.learnable_perturbation_list) * 6), np.array([1] * len(self.learnable_perturbation_list) * 6))
         self.learnable_perturbation_act = np.zeros(len(self.learnable_perturbation_list) * 6)
 
-        self.velrew_weight = 1.0
+        self.velrew_weight = -1.0
         self.angvel_rew = 0.0
         self.angvel_clip = 10.0
         self.alive_bonus = 1.0
         self.energy_penalty = 1e-3
+        self.action_bound_penalty = 1.0
 
         self.UP_noise_level = 0.0
-        self.resample_MP = True  # whether to resample the model paraeters
+        self.resample_MP = False  # whether to resample the model paraeters
 
         self.actuator_nonlinearity = False
         self.actuator_nonlin_coef = 1.0
@@ -197,7 +198,7 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
 
         utils.EzPickle.__init__(self)
 
-    def resample_task(self):
+    def resample_task(self, iter_num = None):
         world_selection = 0#np.random.randint(len(self.dart_worlds))
         self.dart_world = self.dart_worlds[world_selection]
         self.robot_skeleton = self.dart_world.skeletons[-1]
@@ -207,7 +208,12 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         # self.param_manager.resample_parameters()
         self.current_param = self.param_manager.get_simulator_parameters()
 
-        self.velrew_weight = np.random.choice([-1.0, 1.0])
+        # self.velrew_weight = np.random.choice([-1.0, 1.0])
+        # if iter_num is not None:
+        #     if iter_num % 2 == 0:
+        #         self.velrew_weight = 1.0
+        #     else:
+        #         self.velrew_weight = -1.0
 
         obstacle_height = np.random.choice([0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8])
         self.obs_height = obstacle_height
@@ -403,6 +409,7 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         return reward
 
     def step(self, a):
+        action_bound_violation = np.sum(np.clip(np.abs(a) - 1, 0, 10000))
         if self.pseudo_lstm_dim > 0:
             self.hidden_states = a[self.act_dim - self.pseudo_lstm_dim * 2:]
             a = a[0:self.act_dim - self.pseudo_lstm_dim * 2]
@@ -431,6 +438,7 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         self.pre_advance()
         self.advance(a)
         reward = self.reward_func(a)
+        reward -= self.action_bound_penalty * action_bound_violation
 
         done = self.terminated()
         if done:
