@@ -29,8 +29,6 @@ class DartWalker2dEnv(dart_env.DartEnv, utils.EzPickle):
         self.randomize_ground_vib = False
         self.ground_vib_input = False
 
-
-
         self.action_filtering = 0  # window size of filtering, 0 means no filtering
         self.action_filter_cache = []
         self.action_filter_in_env = False  # whether to filter out actions in the environment
@@ -283,8 +281,8 @@ class DartWalker2dEnv(dart_env.DartEnv, utils.EzPickle):
         ob = self._get_obs()
 
         self.gait_freq = 0
-        if len(self.cycle_times) > 0:
-            self.gait_freq = 1.0 / (np.mean(self.cycle_times) * 2)
+        # if len(self.cycle_times) > 0:
+        #     self.gait_freq = 1.0 / (np.mean(self.cycle_times) * 2)
 
         return ob, reward, done, {'dyn_model_id':0, 'state_index':self.state_index, 'gait_frequency':self.gait_freq}
 

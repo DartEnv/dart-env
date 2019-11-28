@@ -76,7 +76,7 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         self.learnable_perturbation_space = spaces.Box(np.array([-1] * len(self.learnable_perturbation_list) * 6), np.array([1] * len(self.learnable_perturbation_list) * 6))
         self.learnable_perturbation_act = np.zeros(len(self.learnable_perturbation_list) * 6)
 
-        self.velrew_weight = -1.0
+        self.velrew_weight = 1.0
         self.angvel_rew = 0.0
         self.angvel_clip = 10.0
         self.alive_bonus = 1.0
@@ -196,6 +196,8 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
 
         self.terminator_net = None
 
+        # self.param_manager.set_simulator_parameters([0.05, 0.8])
+
         utils.EzPickle.__init__(self)
 
     def resample_task(self, iter_num = None):
@@ -205,7 +207,7 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
  
         self.resample_MP = False
 
-        # self.param_manager.resample_parameters()
+        self.param_manager.resample_parameters()
         self.current_param = self.param_manager.get_simulator_parameters()
 
         # self.velrew_weight = np.random.choice([-1.0, 1.0])

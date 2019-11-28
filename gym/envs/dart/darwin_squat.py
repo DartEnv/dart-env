@@ -42,22 +42,22 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
 
         self.adjustable_leg_compliance = False
 
-        self.input_leg_tracking_error = True
+        self.input_leg_tracking_error = False
 
         self.input_contact_bin = False
         self.num_contact_bin = 4
 
-        self.input_range_sensor = True
+        self.input_range_sensor = False
         self.range_sensor_param = [0.1, 10]  # radius from the foot center, number of sensors
 
-        self.variation_scheduling = None#[[0.0, {'obstacle_height_range': 0.0}], [1.0, {'obstacle_height_range': 0.001}]]
+        self.variation_scheduling = [[0.0, {'obstacle_height_range': 0.0}], [1.0, {'obstacle_height_range': 0.001}]]
 
         self.gyro_only_mode = False
         self.leg_only_observation = True   # only read the leg motor states
 
         self.action_filtering = 5 # window size of filtering, 0 means no filtering
         self.action_filter_cache = []
-        self.butterworth_filter = False
+        self.butterworth_filter = True
 
         self.action_delay = 0.0
         self.action_queue = []
@@ -74,7 +74,7 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
         self.kp_ratios = [1.0, 1.0, 1.0, 1.0, 1.0]
         self.kd_ratios = [1.0, 1.0, 1.0, 1.0, 1.0]
 
-        self.use_discrete_action = False
+        self.use_discrete_action = True
 
         self.use_sysid_model = True
 
@@ -105,7 +105,7 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
         self.randomize_action_delay = True
         self.load_keyframe_from_file = True
         self.randomize_gravity_sch = False
-        self.randomize_obstacle = True
+        self.randomize_obstacle = False
         self.randomize_gyro_bias = True
         self.use_zeroed_gyro = True
         self.gyro_bias = np.array([0.0, 0.0])
@@ -161,6 +161,7 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
 
         self.act_dim = 20
         if self.adjustable_leg_compliance:
+            obs_dim += 2
             self.act_dim += 2  # one for each ankle
         self.control_bounds = np.array([-np.ones(self.act_dim, ), np.ones(self.act_dim, )])
 
@@ -256,6 +257,10 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
             for i in range(self.range_sensor_param[1]):
                 range_sensor_perm.append(beginid + i)
             obs_perm_base = np.concatenate([obs_perm_base, range_sensor_perm])
+
+        if self.adjustable_leg_compliance:
+            beginid = len(obs_perm_base)
+            obs_perm_base = np.concatenate([obs_perm_base, [beginid + 1, beginid]])
 
         if self.train_UP:
             obs_perm_base = np.concatenate([obs_perm_base, np.arange(len(obs_perm_base), len(obs_perm_base) + len(
@@ -490,7 +495,7 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
             self.setup_constref()
 
         if self.butterworth_filter:
-            self.action_filter = ActionFilter(self.act_dim, 3, int(1.0/self.dt), low_cutoff=0.0, high_cutoff=3.0)
+            self.action_filter = ActionFilter(self.act_dim, 3, int(1.0/self.dt), low_cutoff=0.0, high_cutoff=2.5)
 
         # self.set_robot_optimization_parameters(np.array([-0.27573608, -0.04001381,  0.16576692, -0.45604828,  0.83507119,
         # 0.2363036 , -0.37442629, -0.77073466,  0.69862929, -0.85059406]) * 0.01)
@@ -767,8 +772,9 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
             return
         clamped_control = np.array(a)
 
-        if self.butterworth_filter:
-            clamped_control = self.action_filter.filter_action(clamped_control)
+        # if self.butterworth_filter:
+        #     clamped_control = self.action_filter.filter_action(clamped_control)
+        self.action_buffer.append(np.copy(clamped_control))
 
         for i in range(len(clamped_control)):
             if clamped_control[i] > self.control_bounds[1][i]:
@@ -792,10 +798,12 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
 
         self.ref_target = self.get_ref_pose(self.t)
 
-
         cur_target = self.ref_target + clamped_control * self.delta_angle_scale
 
+        cur_target = self.action_filter.filter_action(cur_target)
+
         cur_target = np.clip(cur_target, JOINT_LOW_BOUND, JOINT_UP_BOUND)
+
 
         self.apply_target_pose(cur_target)
 
@@ -1009,7 +1017,7 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
             if self.action_filtering > 0:
                 a = np.mean(self.action_filter_cache, axis=0)
 
-        self.action_buffer.append(np.copy(a))
+            # self.action_buffer.append(np.copy(a))
 
         # modify gravity according to schedule
         grav = self.gravity_sch[0][1]
@@ -1224,7 +1232,8 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
         if self.input_leg_tracking_error:
             cur_leg_pose = np.array(self.robot_skeleton.q)[self.observed_dof_ids]
             target_leg_pose = self.target[np.array(self.observed_dof_ids)-6]
-            state = np.concatenate([state, (cur_leg_pose - target_leg_pose)])
+            leg_tracking_index = len(state)
+            state = np.concatenate([state, (cur_leg_pose)])
 
         if self.input_contact_bin:
             contacts = self.dart_world.collision_result.contacts
@@ -1278,6 +1287,9 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
             right_foot_range = np.clip(right_foot_range, 0.0, 0.2)
             state = np.concatenate([state, left_foot_range, right_foot_range])
 
+        if self.adjustable_leg_compliance:
+            state = np.concatenate([state, [self.left_leg_compliance, self.right_leg_compliance]])
+
         if self.train_UP:
             #UP = self.param_manager.get_simulator_parameters()
             state = np.concatenate([state, self.current_param])
@@ -1295,7 +1307,12 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
                     else:
                         final_obs = np.concatenate([final_obs, self.observation_buffer[-self.obs_delay - 1 - i] - self.observation_buffer[-self.obs_delay - 1]])
                 else:
-                    final_obs = np.concatenate([final_obs, self.observation_buffer[-self.obs_delay - 1 - i]])
+                    hist_obs = self.observation_buffer[-self.obs_delay - 1 - i]
+                    if self.input_leg_tracking_error:
+                        target_leg_pose = self.target[np.array(self.observed_dof_ids) - 6]
+                        # Use the current target to offset the observed leg angles, to match real world case
+                        hist_obs[leg_tracking_index:leg_tracking_index+len(target_leg_pose)] -= target_leg_pose
+                    final_obs = np.concatenate([final_obs, hist_obs])
             else:
                 final_obs = np.concatenate([final_obs, self.observation_buffer[0] * 0.0])
 
@@ -1419,14 +1436,17 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
         self.perturb_force = np.array([0.0, 0.0, 0.0])
         self.cur_step = 0
 
-        if self.butterworth_filter:
-            self.action_filter.reset_filter()
-
         self.state_cache = [np.array(self.robot_skeleton.q)[6:], 0.0, 0.015 + np.random.normal(0.0, 0.005)]
         self.gyro_cache = [self.get_sim_bno55(), 0.0, 0.015 + np.random.normal(0.0, 0.005)]
 
         self.action_queue = []
         self.target = self.init_q[self.actuated_dof_ids]
+
+        if self.butterworth_filter:
+            self.action_filter.reset_filter(self.target)
+
+        self.left_leg_compliance = 1
+        self.right_leg_compliance = 1
 
         return self._get_obs()
 
