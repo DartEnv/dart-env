@@ -27,7 +27,7 @@ class Walker2dEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         self.action_buffer = []
         self.state_buffer = []
 
-        self.obs_delay = 1
+        self.obs_delay = 0
         self.act_delay = 0
 
         self.cur_step = 0
@@ -125,6 +125,10 @@ class Walker2dEnv(mujoco_env.MujocoEnv, utils.EzPickle):
     def reset_model(self):
         qpos = self.init_qpos# + self.np_random.uniform(low=-.005, high=.005, size=self.model.nq)
         # qpos[3] += 0.5
+        if np.random.random() > 0.5:
+            qpos[3] += 0.1
+        else:
+            qpos[6] += 0.1
         self.set_state(
             qpos,
             self.init_qvel# + self.np_random.uniform(low=-.005, high=.005, size=self.model.nv)

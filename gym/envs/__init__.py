@@ -675,7 +675,7 @@ register(
 register(
     id='DartBallWalker-v1',
     entry_point='gym.envs.dart:DartBallWalkerEnv',
-    max_episode_steps=400,
+    max_episode_steps=1000,
 )
 
 register(

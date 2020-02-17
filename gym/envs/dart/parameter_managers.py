@@ -24,8 +24,8 @@ class hopperContactMassManager:
         self.actuator_nonlin_range = [0.75, 1.5]
         self.reward_predictor = None
 
-        self.activated_param = [0, 5]#[0,1, 2,3,4,5, 6,7,8, 9, 12,13,14,15]
-        self.controllable_param = [0, 5]#[0,1, 2,3,4,5, 6,7,8, 9, 12,13,14,15]
+        self.activated_param = [5, 9]#[0, 1, 2, 5, 9]#[0,1, 2,3,4,5, 6,7,8, 9, 12,13,14,15]
+        self.controllable_param = [5, 9]#[0, 1, 2, 5, 9]#[0,1, 2,3,4,5, 6,7,8, 9, 12,13,14,15]
 
         self.binned_param = 0 # don't bin if = 0
 
@@ -53,8 +53,11 @@ class hopperContactMassManager:
         cur_power = self.simulator.action_scale
         power_param = (cur_power[0] - self.power_range[0]) / (self.power_range[1] - self.power_range[0])
 
-        cur_ank_power = self.simulator.action_scale[2]
-        ank_power_param = (cur_ank_power - self.ankle_range[0]) / (self.ankle_range[1] - self.ankle_range[0])
+        if self.simulator.pid_controller is not None:
+            ank_power_param = 1.0
+        else:
+            cur_ank_power = self.simulator.action_scale[2]
+            ank_power_param = (cur_ank_power - self.ankle_range[0]) / (self.ankle_range[1] - self.ankle_range[0])
 
         cur_velrew_weight = self.simulator.velrew_weight
         velrew_param = (cur_velrew_weight - self.velrew_weight_range[0]) / (self.velrew_weight_range[1] - self.velrew_weight_range[0])
@@ -103,7 +106,7 @@ class hopperContactMassManager:
                 cur_id += 1
         if 9 in self.controllable_param:
             power = x[cur_id] * (self.power_range[1] - self.power_range[0]) + self.power_range[0]
-            self.simulator.action_scale = np.array([power, power, power])
+            self.simulator.action_scale[0:3] = np.array([power, power, power])
             cur_id += 1
         if 10 in self.controllable_param:
             ankpower = x[cur_id] * (self.ankle_range[1] - self.ankle_range[0]) + self.ankle_range[0]
@@ -165,8 +168,8 @@ class mjHopperManager:
         self.armature_range = [0.05, 0.98]
         self.ankle_jnt_range = [0.5, 1.0]
 
-        self.activated_param = [0, 1,2,3,4, 5,6,7, 8, 10, 11, 12, 13]
-        self.controllable_param = [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13]
+        self.activated_param = [1]#[0, 1,2,3,4, 5,6,7, 8, 10, 11, 12, 13]
+        self.controllable_param = [1]#[0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13]
 
         self.param_dim = len(self.activated_param)
         self.sampling_selector = None
@@ -375,8 +378,8 @@ class walker2dParamManager:
         self.left_leg_power = [20, 150]
         self.right_leg_power = [20, 150]
 
-        self.activated_param = [0,1,2,3,4,5, 17, 19, 20]#[0,1,2,3,4,5,6,  7,8,9,10,11,12,  13, 14, 15, 16]
-        self.controllable_param = [0,1,2,3,4,5, 17, 19, 20]#[0,1,2,3,4,5,6,  7,8,9,10,11,12,  13, 14, 15, 16]
+        self.activated_param = [0, 2]#[0,1,2,3,4,5, 17, 19, 20]#[0,1,2,3,4,5,6,  7,8,9,10,11,12,  13, 14, 15, 16]
+        self.controllable_param = [0, 2]#[0,1,2,3,4,5, 17, 19, 20]#[0,1,2,3,4,5,6,  7,8,9,10,11,12,  13, 14, 15, 16]
 
         self.param_dim = len(self.activated_param)
         self.sampling_selector = None

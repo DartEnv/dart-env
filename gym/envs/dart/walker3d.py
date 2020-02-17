@@ -8,6 +8,7 @@ import os
 
 from gym.envs.dart.parameter_managers import *
 import time
+from gym.envs.dart.action_filter import *
 
 class DartWalker3dEnv(dart_env.DartEnv, utils.EzPickle):
     def __init__(self):
@@ -27,6 +28,9 @@ class DartWalker3dEnv(dart_env.DartEnv, utils.EzPickle):
         self.running_avg_rew_only = True
         self.avg_rew_weighting = []
         self.vel_cache = []
+        self.butterworth_filter = True
+
+        self.staged_reward = True
 
         self.target_ang = None
 
@@ -50,7 +54,7 @@ class DartWalker3dEnv(dart_env.DartEnv, utils.EzPickle):
         self.current_pd = self.init_balance_pd
         self.vel_enforce_kp = self.init_vel_pd
 
-        self.energy_weight = 0.4
+        self.energy_weight = 0.1
         self.vel_reward_weight = 3.0
 
         self.local_spd_curriculum = True
@@ -101,6 +105,9 @@ class DartWalker3dEnv(dart_env.DartEnv, utils.EzPickle):
                                                       -34, 42, 41, 43])
 
         self.act_perm = np.array([-0.0001, -1, 2, 9, -10, -11, 12, 13, -14, 3, -4, -5, 6, 7, -8])
+
+        if self.butterworth_filter:
+            self.action_filter = ActionFilter(15, 3, int(1.0/self.dt), low_cutoff=0.0, high_cutoff=6.0)
 
         utils.EzPickle.__init__(self)
 
@@ -169,6 +176,9 @@ class DartWalker3dEnv(dart_env.DartEnv, utils.EzPickle):
         self.do_simulation(tau, self.frame_skip)
 
     def step(self, a):
+        if self.butterworth_filter:
+            a = self.action_filter.filter_action(a)
+
         if self.smooth_tv_change:
             self.target_vel = (np.min([self.t, self.tv_endtime]) / self.tv_endtime) * (self.final_tv - self.init_tv) + self.init_tv
             self.treadmill_vel = (np.min([self.t, self.treadmill_tv_endtime]) / self.treadmill_tv_endtime) * (
@@ -267,6 +277,10 @@ class DartWalker3dEnv(dart_env.DartEnv, utils.EzPickle):
         foot_rew = 5*(np.max([self.robot_skeleton.bodynode('h_thigh').C[1], self.robot_skeleton.bodynode('h_thigh_left').C[1]])-0.8)
 
         reward = vel_rew + alive_bonus - action_pen - deviation_pen - rot_pen# + jump_rew + ang_vel_rew# - contact_pen
+
+        if self.staged_reward:
+            reward = 10.0 - action_pen - np.sum(np.abs(self.robot_skeleton.q[3:6])) * 2.0
+
         pos_rew = alive_bonus - deviation_pen
         neg_pen = vel_rew - action_pen
 
@@ -278,8 +292,8 @@ class DartWalker3dEnv(dart_env.DartEnv, utils.EzPickle):
                     (height > 1.0) and (height < 3.0) and (abs(ang_cos_uwd) < 1.2) and (abs(ang_cos_fwd) < 1.2)
                     and np.abs(angle) < 1.2 and np.abs(self.robot_skeleton.q[5]) < 1.2 and np.abs(side_deviation) < 0.9)
 
-        if not self.disableViewer:
-            done = False
+        # if not self.disableViewer:
+        #     done = False
 
         self.stepwise_rewards.append(reward)
 
@@ -327,6 +341,37 @@ class DartWalker3dEnv(dart_env.DartEnv, utils.EzPickle):
         if self.init_push:
             qpos[0] = self.target_vel
         self.set_state(qpos, qvel)
+
+        if self.staged_reward:
+            valid_init = False
+            while not valid_init:
+                self.set_state(qpos, qvel)
+                for i in range(150):
+                    self.robot_skeleton.set_forces(np.concatenate([[0, 0, 0, 0, 0, 0], np.random.uniform(-1, 1, len(self.action_scale)) * self.action_scale]))
+                    self.dart_world.step()
+                s = self.state_vector()
+                height = self.robot_skeleton.bodynodes[1].com()[1]
+                side_deviation = self.robot_skeleton.bodynodes[1].com()[2]
+                angle = self.robot_skeleton.q[3]
+                upward = np.array([0, 1, 0])
+                upward_world = self.robot_skeleton.bodynodes[1].to_world(np.array([0, 1, 0])) - \
+                               self.robot_skeleton.bodynodes[1].to_world(np.array([0, 0, 0]))
+                upward_world /= np.linalg.norm(upward_world)
+                ang_cos_uwd = np.dot(upward, upward_world)
+                ang_cos_uwd = np.arccos(ang_cos_uwd)
+                forward = np.array([1, 0, 0])
+                forward_world = self.robot_skeleton.bodynodes[1].to_world(np.array([1, 0, 0])) - \
+                                self.robot_skeleton.bodynodes[1].to_world(np.array([0, 0, 0]))
+                forward_world /= np.linalg.norm(forward_world)
+                ang_cos_fwd = np.dot(forward, forward_world)
+                ang_cos_fwd = np.arccos(ang_cos_fwd)
+                done = not (np.isfinite(s).all() and (np.abs(s[2:]) < 100).all() and
+                            (height > 1.0) and (height < 3.0) and (abs(ang_cos_uwd) < 1.2) and (abs(ang_cos_fwd) < 1.2)
+                            and np.abs(angle) < 1.2 and np.abs(self.robot_skeleton.q[5]) < 1.2 and np.abs(
+                            side_deviation) < 0.9)
+                if not done:
+                    valid_init = True
+
         self.t = 0
         self.cur_step = 0
         self.stepwise_rewards = []
@@ -346,6 +391,9 @@ class DartWalker3dEnv(dart_env.DartEnv, utils.EzPickle):
 
         if self.target_ang is not None and np.random.random() < 0.5:
             self.target_ang *= -1
+
+        if self.butterworth_filter:
+            self.action_filter.reset_filter(np.zeros(15))
 
         return self._get_obs()
 

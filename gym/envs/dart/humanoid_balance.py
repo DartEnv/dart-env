@@ -1,7 +1,7 @@
 import numpy as np
 from gym import utils
 from gym.envs.dart import dart_env
-
+from gym.envs.dart.action_filter import *
 
 class DartHumanoidBalanceEnv(dart_env.DartEnv, utils.EzPickle):
     # initialization
@@ -11,6 +11,8 @@ class DartHumanoidBalanceEnv(dart_env.DartEnv, utils.EzPickle):
 
         # set observation dimension, humanoid has (23+6)*2
         observation_dim = 56
+
+        self.butterworth_filter = True
 
         # initialize dart-env
         dart_env.DartEnv.__init__(self, 'kima/kima_human_balance.skel', frame_skip=15, observation_size=observation_dim,
@@ -25,6 +27,9 @@ class DartHumanoidBalanceEnv(dart_env.DartEnv, utils.EzPickle):
         self.push_target = 'head'
 
         self.current_step = 0
+
+        if self.butterworth_filter:
+            self.action_filter = ActionFilter(23, 3, int(1.0/self.dt), low_cutoff=0.0, high_cutoff=6.0)
 
         utils.EzPickle.__init__(self)
 
@@ -48,12 +53,19 @@ class DartHumanoidBalanceEnv(dart_env.DartEnv, utils.EzPickle):
     # take a step forward in time by executing action
     def step(self, action):
         # advance the simulation
+        if self.butterworth_filter:
+            action = self.action_filter.filter_action(action)
+
         tau = np.zeros(29)
         tau[6:] = np.clip(action, -1, 1)*200
         self.do_simulation(tau, self.frame_skip)
 
         # calculate reward
-        reward = 3.0 - np.square(action).sum()
+        reward = 3.0 - np.square(action).sum() * 0.1
+
+        current_q = self.robot_skeleton.q
+        q_dev = np.exp(-np.square(np.clip(current_q, -10, 10)).sum())
+        reward += q_dev
 
         # termination criteria
         s = self.state_vector()
@@ -100,6 +112,9 @@ class DartHumanoidBalanceEnv(dart_env.DartEnv, utils.EzPickle):
         observation = np.zeros(56)
         observation[0] = self.state_vector()[1]
         observation[1:] = self.state_vector()[3:]
+
+        if self.butterworth_filter:
+            self.action_filter.reset_filter(np.zeros(23))
 
         return observation
 

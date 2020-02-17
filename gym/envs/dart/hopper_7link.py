@@ -212,7 +212,7 @@ class DartHopper7LinkEnv(dart_env.DartEnv, utils.EzPickle):
 
         self.do_simulation(tau, self.frame_skip)
 
-    def _step(self, a):
+    def step(self, a):
         pre_state = [self.state_vector()]
 
         posbefore = self.robot_skeleton.q[0]

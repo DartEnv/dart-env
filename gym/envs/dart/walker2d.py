@@ -22,7 +22,7 @@ class DartWalker2dEnv(dart_env.DartEnv, utils.EzPickle):
 
         self.diff_obs = False
 
-        self.terminate_for_not_moving = None #[0.5, 1.0]  # [distance, time], need to mvoe distance in time
+        self.terminate_for_not_moving = None#[1.0, 1.5]  # [distance, time], need to mvoe distance in time
 
         self.vibrating_ground = False
         self.ground_vib_params = [0.12,1.5] # magnitude, frequency
@@ -343,10 +343,13 @@ class DartWalker2dEnv(dart_env.DartEnv, utils.EzPickle):
         self.dart_world.reset()
         qpos = self.robot_skeleton.q + self.np_random.uniform(low=-.00015, high=.00015, size=self.robot_skeleton.ndofs)
         qvel = self.robot_skeleton.dq + self.np_random.uniform(low=-.00015, high=.00015, size=self.robot_skeleton.ndofs)
-        if np.random.random() > 0.5:
-            qpos[3] += 0.1
-        else:
-            qpos[6] += 0.1
+        # if np.random.random() > 0.5:
+        #     qpos[3] += 0.1
+        # else:
+        #     qpos[6] += 0.1
+        #MMHACK
+        qpos[3] += 0.3
+
         self.set_state(qpos, qvel)
 
         if self.resample_MP:

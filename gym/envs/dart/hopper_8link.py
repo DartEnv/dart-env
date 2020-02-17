@@ -1,3 +1,4 @@
+import os
 import numpy as np
 from gym import utils
 from gym.envs.dart import dart_env
@@ -6,7 +7,7 @@ from gym.envs.dart import dart_env
 class DartHopper8LinkEnv(dart_env.DartEnv, utils.EzPickle):
     def __init__(self):
         self.control_bounds = np.array([[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],[-1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0]])
-        self.action_scale = 100
+        self.action_scale = 50
         self.include_action_in_obs = False
         self.randomize_dynamics = False
         obs_dim = 19
@@ -20,6 +21,18 @@ class DartHopper8LinkEnv(dart_env.DartEnv, utils.EzPickle):
         self.reverse_order = False
 
         self.feet_specialized = False
+
+        self.pid_controller = [150, 9]
+        if self.pid_controller is not None:
+            self.torque_limit = [-100, 100]
+            self.action_scale = 1.0
+
+            # MMHACK: PCA action space
+            # self.action_scale = 4.0
+            # self.control_bounds = np.array([[1.0]*6, [-1.0]*6])
+            # import pickle
+            # fullpath = os.path.join(os.path.dirname(__file__), "models", "pcamodel_8link.pkl")
+            # self.pca = pickle.load(open(fullpath, 'rb'))
 
         if self.supp_input:
             obs_dim += 3 * 8  # [contact, local_x, local_y]
@@ -36,6 +49,13 @@ class DartHopper8LinkEnv(dart_env.DartEnv, utils.EzPickle):
         self.dart_world.set_collision_detector(3)
 
         self.initialize_articunet()
+
+        if self.pid_controller is not None:
+            self.joint_lower_lim = np.array(self.robot_skeleton.q_lower)[3:]
+            self.joint_upper_lim = np.array(self.robot_skeleton.q_upper)[3:]
+            expand = (self.joint_upper_lim - self.joint_lower_lim) * 0.1
+            self.joint_lower_lim -= expand
+            self.joint_upper_lim += expand
 
         utils.EzPickle.__init__(self)
 
@@ -147,6 +167,25 @@ class DartHopper8LinkEnv(dart_env.DartEnv, utils.EzPickle):
 
             self.net_modules.append([[], None, [15, 16, 17, 18, 19, 20, 21], None, False])
 
+    def do_simulation(self, tau, n_frames):
+        if self.pid_controller is not None:
+            target_angles = (np.copy(tau[3:]) + 1.0) / 2.0 * (self.joint_upper_lim - self.joint_lower_lim) + self.joint_lower_lim
+        average_torque = []
+        for _ in range(n_frames):
+            if self.pid_controller is not None:
+                jpos = np.array(self.robot_skeleton.q)[3:]
+                jvel = np.array(self.robot_skeleton.dq)[3:]
+
+                torque = self.pid_controller[0] * (target_angles - jpos) - self.pid_controller[1] * jvel
+                clipped_torque = np.clip(torque, self.torque_limit[0], self.torque_limit[1])
+
+                tau = np.concatenate([[0.0] * 3, clipped_torque])
+                average_torque.append(clipped_torque)
+
+            self.robot_skeleton.set_forces(tau)
+            self.dart_world.step()
+        if self.pid_controller is not None:
+            self.average_torque = np.mean(average_torque, axis=0)
 
     def advance(self, a):
         clamped_control = np.array(a)
@@ -160,9 +199,13 @@ class DartHopper8LinkEnv(dart_env.DartEnv, utils.EzPickle):
         tau = np.zeros(self.robot_skeleton.ndofs)
         tau[3:] = clamped_control * self.action_scale
 
+        # MMHACK: PCA action space
+        # import pdb; pdb.set_trace()
+        # tau[3:] = self.pca.inverse_transform([clamped_control * self.action_scale])[0]
+
         self.do_simulation(tau, self.frame_skip)
 
-    def _step(self, a):
+    def step(self, a):
         pre_state = [self.state_vector()]
 
         posbefore = self.robot_skeleton.q[0]
@@ -186,20 +229,24 @@ class DartHopper8LinkEnv(dart_env.DartEnv, utils.EzPickle):
                             self.body_contact_list[bid - 2] = 1.0
 
         alive_bonus = 1.0
-        reward = 0.2 * (posafter - posbefore) / self.dt
+        reward = 0.3 * (posafter - posbefore) / self.dt
         reward += alive_bonus
-        reward -= 2e-3 * np.square(a).sum()
-        reward -= 3e-3 * np.abs(np.dot(a, self.robot_skeleton.dq[3:])).sum()
+        if self.pid_controller is None:
+            reward -= 2e-3 * np.square(a).sum()
+        else:
+            reward -= 1e-3 * np.square(self.average_torque / self.torque_limit[1]).sum()
+
+        # reward -= 3e-3 * np.abs(np.dot(a, self.robot_skeleton.dq[3:])).sum()
 
         # penalize distance between whole-body COM and foot COM
-        reward -= 1e-4 * np.square(self.robot_skeleton.bodynodes[2].C - self.robot_skeleton.bodynodes[-1].C).sum()
+        # reward -= 1e-4 * np.square(self.robot_skeleton.bodynodes[2].C - self.robot_skeleton.bodynodes[-1].C).sum()
 
         s = self.state_vector()
         self.accumulated_rew += reward
         self.num_steps += 1.0
         #print(self.num_steps)
         done = not (np.isfinite(s).all() and (np.abs(s[2:]) < 100).all() and
-                    (height > 0.9) and (height < self.init_height + 0.5))
+                    (height > 1.7) and (height < self.init_height + 0.5))
         if not (np.isfinite(s).all() and (np.abs(s[2:]) < 100).all()):
             reward = 0
         if fall_on_ground:

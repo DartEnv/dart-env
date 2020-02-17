@@ -16,7 +16,12 @@ class HopperEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         self.previous_pose = np.zeros(5)
         self.input_time = False
 
-        self.terminate_for_not_moving = None#[0.5, 1.0]
+        # self.obs_ranges = np.array([[0.6, 1.8], [-0.5, 0.5], ])
+
+        self.randomize_history_input = False
+        self.history_buffers = []
+
+        self.terminate_for_not_moving = [0.5, 1.0]
 
         self.pid_controller = None#[250, 25]
         if self.pid_controller is not None:
@@ -124,17 +129,16 @@ class HopperEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         self.pre_advance()
         self.advance(a)
         self.post_advance()
-        #
-        # if self.cur_step > 200 and self.cur_step < 400:
-        #     self.model.geom_friction[-1][0] = 0.0
-        #     self.model.geom_friction[0][0] = 0.0
-        #     self.model.geom_friction[1][0] = 0.0
-        #     self.model.geom_friction[2][0] = 0.0
-        # else:
-        #     self.model.geom_friction[-1][0] = 2.0
-        #     self.model.geom_friction[0][0] = 2.0
-        #     self.model.geom_friction[1][0] = 2.0
-        #     self.model.geom_friction[2][0] = 2.0
+        # MMHACK
+        # if hasattr(self, "env_change_parameters"):
+        #     if self.cur_step > self.env_change_parameters[0] and self.cur_step < self.env_change_parameters[0] + self.env_change_parameters[1]:
+        #         self.model.actuator_gear[0][0] = 150
+        #         self.model.actuator_gear[1][0] = 150
+        #         self.model.actuator_gear[2][0] = 150
+        #     else:
+        #         self.model.actuator_gear[0][0] = 300
+        #         self.model.actuator_gear[1][0] = 300
+        #         self.model.actuator_gear[2][0] = 300
 
         reward = self.reward_func(a)
 
@@ -166,11 +170,25 @@ class HopperEnv(mujoco_env.MujocoEnv, utils.EzPickle):
             self.observation_buffer.append(np.copy(state))
 
         final_obs = np.array([])
+        current_obs = np.array([])  # the current part of observation
+        history_obs = np.array([])  # the history part of the observation
         for i in range(self.include_obs_history):
             if self.obs_delay + i < len(self.observation_buffer):
                 final_obs = np.concatenate([final_obs, self.observation_buffer[-self.obs_delay - 1 - i]])
+                if i == 0:
+                    current_obs = np.concatenate([history_obs, self.observation_buffer[-self.obs_delay - 1 - i]])
+                if i > 0 and self.randomize_history_input:
+                    history_obs = np.concatenate([history_obs, self.observation_buffer[-self.obs_delay - 1 - i]])
             else:
                 final_obs = np.concatenate([final_obs, self.observation_buffer[0] * 0.0])
+                if i == 0:
+                    current_obs = np.concatenate([history_obs, self.observation_buffer[0] * 0.0])
+                if i > 0 and self.randomize_history_input:
+                    history_obs = np.concatenate([history_obs, self.observation_buffer[0] * 0.0])
+        if self.randomize_history_input:
+            self.history_buffers.append(history_obs)
+            final_obs = np.concatenate(
+                [current_obs, self.history_buffers[np.random.randint(len(self.history_buffers))]])
 
         for i in range(self.include_act_history):
             if i < len(self.action_buffer):
@@ -191,8 +209,14 @@ class HopperEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         return np.array([full_obs[5], full_obs[6]])
 
     def reset_model(self):
-        qpos = self.init_qpos# + self.np_random.uniform(low=-.005, high=.005, size=self.model.nq)
-        qvel = self.init_qvel# + self.np_random.uniform(low=-.005, high=.005, size=self.model.nv)
+        qpos = np.array(self.init_qpos)# + self.np_random.uniform(low=-.005, high=.005, size=self.model.nq)
+        qvel = np.array(self.init_qvel)# + self.np_random.uniform(low=-.005, high=.005, size=self.model.nv)
+        # print(qpos)
+        # qpos[1] -= 0.5
+        # qpos[2] = 1.0
+        # qpos[5] = 0.5
+
+
         self.set_state(qpos, qvel)
 
         self.observation_buffer = []
@@ -201,10 +225,14 @@ class HopperEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         self.cur_step = 0
         self.total_reward = 0
 
+        self.history_buffers = []
+
         if self.resample_MP:
             self.param_manager.resample_parameters()
 
-        self.previous_pose = self.sim.data.qpos.flat[1:]
+        self.previous_pose = np.array(self.sim.data.qpos.flat[1:])
+
+        self.env_change_parameters = [150, 350]#[np.random.randint(150, 500), np.random.randint(300, 400)] # start frame, length
 
         return self._get_obs()
 

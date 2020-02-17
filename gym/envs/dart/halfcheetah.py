@@ -72,6 +72,12 @@ class DartHalfCheetahEnv(dart_env.DartEnv, utils.EzPickle):
         self.param_manager.resample_parameters()
         self.current_param = self.param_manager.get_simulator_parameters()
         self.velrew_weight = np.sign(np.random.randn(1))[0]
+        return self.current_param, self.velrew_weight
+
+    def set_task(self, task_params):
+        self.param_manager.set_simulator_parameters(task_params[0])
+        self.current_param = self.param_manager.get_simulator_parameters()
+        self.velrew_weight = task_params[1]
 
     def pad_action(self, a):
         full_ac = np.zeros(len(self.robot_skeleton.q))
@@ -101,11 +107,6 @@ class DartHalfCheetahEnv(dart_env.DartEnv, utils.EzPickle):
         tau = np.zeros(self.robot_skeleton.ndofs)
         tau[3:] = clamped_control * self.action_scale * self.g_action_scaler
         self.do_simulation(tau, self.frame_skip)
-
-    def resample_task(self):
-        #self.param_manager.resample_parameters()
-        #self.current_param = self.param_manager.get_simulator_parameters()
-        self.velrew_weight = np.sign(np.random.randn(1))[0]
 
     def about_to_contact(self):
         return False
