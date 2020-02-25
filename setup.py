@@ -7,21 +7,11 @@ from version import VERSION
 
 # Environment-specific dependencies.
 extras = {
-<<<<<<< HEAD
-  'atari': ['atari_py>=0.1.1', 'Pillow', 'PyOpenGL'],
-  'box2d': ['Box2D-kengz'],
-  'classic_control': ['PyOpenGL'],
-  'dart': ['pydart2'],
-  'mujoco': ['mujoco_py>=1.50', 'imageio'],
-  'robotics': ['mujoco_py>=1.50', 'imageio'],
-  'parameter_tuning': ['keras', 'theano'],
-=======
   'atari': ['atari_py~=0.2.0', 'Pillow', 'opencv-python'],
   'box2d': ['box2d-py~=2.3.5'],
   'classic_control': [],
   'mujoco': ['mujoco_py>=1.50, <2.0', 'imageio'],
   'robotics': ['mujoco_py>=1.50, <2.0', 'imageio'],
->>>>>>> upstream/master
 }
 
 # Meta dependency groups.
