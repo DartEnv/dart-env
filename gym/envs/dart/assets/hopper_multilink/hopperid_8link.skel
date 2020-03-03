@@ -305,6 +305,10 @@
                 <child>h_pelvis_aux</child>
                 <axis>
                       <xyz>0.0 1.0 0.0</xyz>
+                      <!--<limit>
+                            <lower>-1.34</lower>
+                            <upper>2.0</upper>
+                      </limit>-->
                 </axis>
                 <init_pos>0</init_pos>
                 <init_vel>0</init_vel>

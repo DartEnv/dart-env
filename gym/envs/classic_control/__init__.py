@@ -5,4 +5,5 @@ from gym.envs.classic_control.pendulum import PendulumEnv
 from gym.envs.classic_control.acrobot import AcrobotEnv
 
 from gym.envs.classic_control.point_reach import PointReachEnv
+from gym.envs.classic_control.minicar_drive import MiniCarEnv
 from gym.envs.classic_control.lqr import LQREnv

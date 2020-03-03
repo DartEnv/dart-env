@@ -205,6 +205,12 @@ register(
     max_episode_steps = 50,
 )
 
+register(
+    id='MiniCar-v1',
+    entry_point = 'gym.envs.classic_control:MiniCarEnv',
+    max_episode_steps = 1000,
+)
+
 # LQR Env
 register(
     id='LQR-v1',

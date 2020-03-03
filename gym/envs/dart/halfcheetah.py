@@ -16,6 +16,7 @@ class DartHalfCheetahEnv(dart_env.DartEnv, utils.EzPickle):
         self.action_scale = np.array([120, 90, 60, 120, 60, 30]) * 1.0
         self.train_UP = False
         self.noisy_input = False
+        self.randomize_initial_state = True
         obs_dim = 17
         self.tilt_z = 0.0
 
@@ -190,8 +191,12 @@ class DartHalfCheetahEnv(dart_env.DartEnv, utils.EzPickle):
         for world in self.dart_worlds:
             world.reset()
         self.zeroed_height = self.robot_skeleton.bodynodes[2].com()[1]
-        qpos = self.robot_skeleton.q + self.np_random.uniform(low=-.005, high=.005, size=self.robot_skeleton.ndofs)
-        qvel = self.robot_skeleton.dq + self.np_random.uniform(low=-.005, high=.005, size=self.robot_skeleton.ndofs)
+        qpos = self.robot_skeleton.q
+        qvel = self.robot_skeleton.dq
+
+        if self.randomize_initial_state:
+            qpos += self.np_random.uniform(low=-.005, high=.005, size=self.robot_skeleton.ndofs)
+            qvel += self.np_random.uniform(low=-.005, high=.005, size=self.robot_skeleton.ndofs)
 
         self.set_state(qpos, qvel)
         if self.resample_MP:

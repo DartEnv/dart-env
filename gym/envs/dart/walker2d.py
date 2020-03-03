@@ -91,6 +91,9 @@ class DartWalker2dEnv(dart_env.DartEnv, utils.EzPickle):
         dart_env.DartEnv.__init__(self, ['walker2d.skel', 'walker2d_variation1.skel'\
                                          , 'walker2d_variation2.skel'], 4, obs_dim, self.control_bounds, disableViewer=True)
 
+        # data structure for actuation modeling
+        self.zeroed_height = self.robot_skeleton.bodynodes[2].com()[1]
+
         self.dart_worlds[0].set_collision_detector(3)
         self.dart_worlds[1].set_collision_detector(0)
         self.dart_worlds[2].set_collision_detector(1)
@@ -402,3 +405,13 @@ class DartWalker2dEnv(dart_env.DartEnv, utils.EzPickle):
     def viewer_setup(self):
         self._get_viewer().scene.tb.trans[2] = -4
 
+    def state_vector(self):
+        s = np.copy(np.concatenate([self.robot_skeleton.q, self.robot_skeleton.dq]))
+        s[1] += self.zeroed_height
+        return s
+
+    def set_state_vector(self, s):
+        snew = np.copy(s)
+        snew[1] -= self.zeroed_height
+        self.robot_skeleton.q = snew[0:len(self.robot_skeleton.q)]
+        self.robot_skeleton.dq = snew[len(self.robot_skeleton.q):]

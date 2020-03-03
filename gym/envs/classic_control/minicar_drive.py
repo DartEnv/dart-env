@@ -7,7 +7,7 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-class PointReachEnv(gym.Env):
+class MiniCarEnv(gym.Env):
     metadata = {
         'render.modes': ['human', 'rgb_array'],
         'video.frames_per_second' : 50
@@ -37,6 +37,7 @@ class PointReachEnv(gym.Env):
                                                 np.concatenate([[10, 10, np.inf, np.inf], [np.inf] * 1]))
 
         self.init_pose = np.zeros(4)
+        self.init_pose[2] = 0.1
         self.targets = [np.array([9.0, 0.0])]
 
         if self.input_target:
@@ -161,7 +162,16 @@ class PointReachEnv(gym.Env):
         rew_before = self.computer_rew()
 
         self.state[2:] += action * self.dt / self.mass + self.wind
-        self.state[2:] = np.clip(self.state[2:], -0.5, 0.5)
+
+        cur_vel = np.linalg.norm(self.state[2:])
+        cur_vel += action[0] * self.dt / self.mass  # put gas or break
+        cur_vel = np.clip(cur_vel, -0.7, 0.7)
+
+        cur_ori = self.state[2:] / np.linalg.norm(self.state[2:])
+        rot = action[1] * 0.6
+        cur_ori = np.array([np.cos(rot) * cur_ori[0] - np.sin(rot) * cur_ori[1], np.sin(rot) * cur_ori[0] + np.cos(rot) * cur_ori[1]])
+        self.state[2:] = cur_ori * cur_vel
+
         self.state[0:2] += self.state[2:] * self.dt
         self.state = self.state.clip(-10, 10)
 
@@ -277,8 +287,6 @@ class PointReachEnv(gym.Env):
 
             self.agent = agent
 
-
-
         if self.state is None: return None
 
         new_pos = self.state[0:2] * scale + offset
@@ -286,6 +294,10 @@ class PointReachEnv(gym.Env):
 
         new_target = self.targets[0] * scale + offset
         self.target_transform.set_translation(new_target[0], new_target[1])
+
+        line = self.viewer.draw_line(new_pos, new_pos + np.array(self.state[2:]) * scale)
+        line.set_color(1, 0, 0)
+        self.viewer.add_onetime(line)
 
         return self.viewer.render(return_rgb_array = mode=='rgb_array')
 

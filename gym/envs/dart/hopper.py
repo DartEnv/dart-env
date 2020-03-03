@@ -5,6 +5,7 @@ from gym.envs.dart import dart_env
 from gym.envs.dart.parameter_managers import *
 from gym.envs.dart.sub_tasks import *
 from gym.envs.dart.spline import *
+from gym.envs.dart.action_filter import *
 import copy
 
 import joblib, os
@@ -23,6 +24,8 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         self.input_time = False
         self.two_pose_input = False  # whether to use two q's instead of q and dq
 
+        self.butterworth_filter = True
+
         self.randomize_history_input = False
         self.history_buffers = []
 
@@ -33,12 +36,12 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
 
         self.sparse_reward = False
 
-        self.void_area = True
+        self.void_area = False
 
         self.obs_ranges = np.array([[0.6, 1.8], [-0.5, 0.5], [-2.6, 0.0], [-2.6, 0.0], [-0.8, 0.8],
                                     [-5.0, 5.0], [-5.0, 5.0], [-10.0, 10.0] ,[-20.0, 20.0] ,[-20.0, 20.0], [-20.0, 20.0]])
         self.quantized_observation = False
-        self.quantization_param = [5, 50, 0.5]  # min, max, current
+        self.quantization_param = [3, 50, 1.0]  # min, max, current
 
         self.pid_controller = None#[500, 5]
         if self.pid_controller is not None:
@@ -149,10 +152,11 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
             obs_dim += 1
 
         if self.quantized_observation:
-            obs_dim += 1
+            obs_dim += 3
             self.control_bounds = np.array([[1.0, 1.0, 1.0, 1.0], [-1.0, -1.0, -1.0, -1.0]])
-            mult = 0.63
+            mult = 1.0
             self.action_scale = np.array([200.0*mult, 200.0*mult, 200.0*mult, 1.0])
+            self.max_quant_budget = 50.0
 
         self.action_bound_model = None
 
@@ -200,7 +204,7 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         self.param_manager.set_simulator_parameters(self.current_param)
 
         self.height_threshold_low = 0.56 * self.robot_skeleton.bodynodes[2].com()[1]
-        self.rot_threshold = 0.8
+        self.rot_threshold = 0.4
 
         if self.staged_reward:
             self.rot_threshold = 1.0
@@ -258,11 +262,11 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
 
         # self.param_manager.set_simulator_parameters([0.9])
 
-        self.robot_skeleton.joints[3].set_damping_coefficient(0, 1.0)
-        self.robot_skeleton.joints[4].set_damping_coefficient(0, 1.0)
-        self.robot_skeleton.joints[5].set_damping_coefficient(0, 1.0)
-        self.dart_world.skeletons[0].bodynodes[0].set_restitution_coeff(0.5)
-        self.dart_world.skeletons[1].bodynodes[-1].set_restitution_coeff(1.0)
+        # self.robot_skeleton.joints[3].set_damping_coefficient(0, 1.0)
+        # self.robot_skeleton.joints[4].set_damping_coefficient(0, 1.0)
+        # self.robot_skeleton.joints[5].set_damping_coefficient(0, 1.0)
+        # self.dart_world.skeletons[0].bodynodes[0].set_restitution_coeff(0.5)
+        # self.dart_world.skeletons[1].bodynodes[-1].set_restitution_coeff(1.0)
 
         if self.pid_controller is not None:
             self.joint_lower_lim = np.array(self.robot_skeleton.q_lower)[3:]
@@ -270,6 +274,9 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
             expand = (self.joint_upper_lim - self.joint_lower_lim) * 0.2
             self.joint_lower_lim -= expand
             self.joint_upper_lim += expand
+
+        if self.butterworth_filter:
+            self.action_filter = ActionFilter(self.act_dim, 3, int(1.0/self.dt), low_cutoff=0.0, high_cutoff=4.0)
 
         utils.EzPickle.__init__(self)
 
@@ -401,6 +408,8 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         else:
             a = self.action_buffer[-self.act_delay - 1]
 
+        a = self.action_filter.filter_action(a)
+
         # else:
         #     print("1")
 
@@ -421,10 +430,6 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
             tau = np.zeros(self.robot_skeleton.ndofs)
             tau[3:] = (clamped_control * self.action_scale)[0:len(tau[3:])]
 
-        # MMHACK: ignore actions
-        if self.void_area:
-            if self.robot_skeleton.q[1] > -0.15:
-                tau *= 0
 
         self.do_simulation(tau, self.frame_skip)
 
@@ -532,8 +537,20 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         if self.learn_getup:
             reward = 1.0 - 0.5 * np.sum(np.abs(np.array(self.robot_skeleton.q)[1:]))
 
-        if self.quantized_observation:
-            reward += 0.0 * (np.exp(-7*self.quantization_param[2])-np.exp(-7))
+        vrew = (posafter - self.posbefore) / self.dt * self.velrew_weight
+        abrew = self.alive_bonus * step_skip
+        jlimrew = 5e-1 * joint_limit_penalty
+        qrew = np.abs(self.robot_skeleton.q[2])
+        hrew = self.height_penalty * np.clip(self.robot_skeleton.dq[1], 0.0, 1e10)
+        # if abs(reward) > 10:
+        #     print(vrew, abrew, jlimrew, qrew, hrew, reward)
+
+        # if self.quantized_observation:
+        #     if self.quantization_param[2] < 0.5:
+        #         reward += 0.2
+        #     if self.current_quant_budget == 0:
+        #         reward -= 1.0
+            # reward += self.current_quant_budget / self.max_quant_budget * 2.0 #0.0 * (np.exp(-7*self.quantization_param[2])-np.exp(-7))
 
         return reward
 
@@ -553,8 +570,12 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
             a = np.mean(self.action_filter_cache, axis=0)
 
         if self.quantized_observation:
-            # self.quantization_param[2] = 0 if a[-1] < 0.0 else 1
-            self.quantization_param[2] = np.clip(a[-1], -1, 1) * 0.5 + 0.5
+            self.quantization_param[2] = 0 if a[-1] < 0.0 else 1
+            if self.quantization_param[2] > 0.5:
+                self.current_quant_budget = max(self.current_quant_budget - 1, 0)
+            if self.current_quant_budget == 0:
+                self.quantization_param[2] = 0
+            # self.quantization_param[2] = np.clip(a[-1], -1, 1) * 0.5 + 0.5
 
         if self.vibrating_ground:
             # self.dart_world.skeletons[0].joints[0].set_rest_position(0, self.ground_vib_params[0] * np.sin(
@@ -678,17 +699,27 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
             state = state + np.random.normal(0, .05, len(state))
 
         if self.quantized_observation:
-            quantize_size = int(self.quantization_param[2] * (self.quantization_param[1] - self.quantization_param[0]) + self.quantization_param[0])
-            # quantize_size = 5
-            quantize_interv = 1.0 / (quantize_size - 1)
+            # quantize_size = int(self.quantization_param[2] * (self.quantization_param[1] - self.quantization_param[0]) + self.quantization_param[0])
+            # # quantize_size = 5
+            # quantize_interv = 1.0 / (quantize_size - 1)
+            #
+            # state = np.clip(state, self.obs_ranges[:, 0], self.obs_ranges[:, 1] + 0.001)
+            # normalized_state = (state - self.obs_ranges[:, 0]) / (self.obs_ranges[:, 1] - self.obs_ranges[:, 0])
+            # quantized_state = np.floor(normalized_state / quantize_interv) * quantize_interv
+            # state = quantized_state * (self.obs_ranges[:, 1] - self.obs_ranges[:, 0]) + self.obs_ranges[:, 0]
+            # state = np.concatenate([state, [self.quantization_param[2], self.current_quant_budget / self.max_quant_budget]])
+            if self.quantization_param[2] < 0.5:
+                state = self.observation_buffer[-1][0:11]
+                cur_choice = 0
+            else:
+                cur_choice = 1
+            if cur_choice == self.last_choice:
+                self.choice_duration += 1
+            else:
+                self.last_choice = cur_choice
+                self.choice_duration = 0
+            state = np.concatenate([state, [cur_choice, self.choice_duration * 0.1, self.current_quant_budget / self.max_quant_budget]])
 
-            state = np.clip(state, self.obs_ranges[:, 0], self.obs_ranges[:, 1] + 0.001)
-            normalized_state = (state - self.obs_ranges[:, 0]) / (self.obs_ranges[:, 1] - self.obs_ranges[:, 0])
-            quantized_state = np.floor(normalized_state / quantize_interv) * quantize_interv
-            state = quantized_state * (self.obs_ranges[:, 1] - self.obs_ranges[:, 0]) + self.obs_ranges[:, 0]
-
-
-            state = np.concatenate([state, [self.quantization_param[2]]])
 
         if self.train_UP:
             UP = self.param_manager.get_simulator_parameters()
@@ -779,6 +810,12 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
             qpos[2] = 1.0
             qpos[5] = 0.5
 
+        if self.quantized_observation:
+            self.current_quant_budget = self.max_quant_budget
+            self.quantization_param = [3, 50, 1.0]  # min, max, current
+            self.last_choice = 1
+            self.choice_duration = 0
+
         self.set_state(qpos, qvel)
 
         if self.resample_MP:
@@ -844,6 +881,9 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
             self.hidden_states = np.zeros(self.pseudo_lstm_dim * 2)
 
         self.accumulated_reward = 0
+
+        if self.butterworth_filter:
+            self.action_filter.reset_filter()
 
         return state
 

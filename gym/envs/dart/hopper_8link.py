@@ -22,7 +22,7 @@ class DartHopper8LinkEnv(dart_env.DartEnv, utils.EzPickle):
 
         self.feet_specialized = False
 
-        self.pid_controller = [150, 9]
+        self.pid_controller = None#[150, 9]
         if self.pid_controller is not None:
             self.torque_limit = [-100, 100]
             self.action_scale = 1.0
@@ -237,7 +237,6 @@ class DartHopper8LinkEnv(dart_env.DartEnv, utils.EzPickle):
             reward -= 1e-3 * np.square(self.average_torque / self.torque_limit[1]).sum()
 
         # reward -= 3e-3 * np.abs(np.dot(a, self.robot_skeleton.dq[3:])).sum()
-
         # penalize distance between whole-body COM and foot COM
         # reward -= 1e-4 * np.square(self.robot_skeleton.bodynodes[2].C - self.robot_skeleton.bodynodes[-1].C).sum()
 
@@ -304,3 +303,14 @@ class DartHopper8LinkEnv(dart_env.DartEnv, utils.EzPickle):
 
     def viewer_setup(self):
         self._get_viewer().scene.tb.trans[2] = -5.5
+
+    def state_vector(self):
+        s = np.copy(np.concatenate([self.robot_skeleton.q, self.robot_skeleton.dq]))
+        s[1] += self.init_height
+        return s
+
+    def set_state_vector(self, s):
+        snew = np.copy(s)
+        snew[1] -= self.init_height
+        self.robot_skeleton.q = snew[0:len(self.robot_skeleton.q)]
+        self.robot_skeleton.dq = snew[len(self.robot_skeleton.q):]

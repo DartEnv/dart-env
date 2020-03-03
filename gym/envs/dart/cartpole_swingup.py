@@ -32,6 +32,8 @@ class DartCartPoleSwingUpEnv(dart_env.DartEnv):
         self.disc_fit_policy = None
         self.learn_additive_pol = False
 
+        self.randomize_initial_state = True
+
         self.split_task_test = False
         self.tasks = TaskList(1)
         self.tasks.add_world_choice_tasks([0])
@@ -233,12 +235,17 @@ class DartCartPoleSwingUpEnv(dart_env.DartEnv):
     def reset_model(self):
         self.total_dist = []
         self.dart_world.reset()
-        qpos = self.robot_skeleton.q# + self.np_random.uniform(low=-.1, high=.1, size=self.robot_skeleton.ndofs)
-        qvel = self.robot_skeleton.dq# + self.np_random.uniform(low=-.01, high=.01, size=self.robot_skeleton.ndofs)
-        if self.np_random.uniform(0, 1) > 0.5:
-            qpos[1] += np.pi
+        qpos = self.robot_skeleton.q
+        qvel = self.robot_skeleton.dq
+        if self.randomize_initial_state:
+            qpos += self.np_random.uniform(low=-.1, high=.1, size=self.robot_skeleton.ndofs)
+            qvel += self.np_random.uniform(low=-.01, high=.01, size=self.robot_skeleton.ndofs)
+            if self.np_random.uniform(0, 1) > 0.5:
+                qpos[1] += np.pi
+            else:
+                qpos[1] += -np.pi
         else:
-            qpos[1] += -np.pi
+            qpos[1] += np.pi
 
         # qpos[1]+=self.np_random.uniform(low=-np.pi, high=np.pi, size=1)
 
