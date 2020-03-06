@@ -202,7 +202,7 @@ register(
 register(
     id='PointReach-v1',
     entry_point = 'gym.envs.classic_control:PointReachEnv',
-    max_episode_steps = 50,
+    max_episode_steps = 150,
 )
 
 register(

@@ -30,7 +30,7 @@ class DartWalker3dEnv(dart_env.DartEnv, utils.EzPickle):
         self.vel_cache = []
         self.butterworth_filter = True
 
-        self.staged_reward = True
+        self.staged_reward = False
 
         self.target_ang = None
 

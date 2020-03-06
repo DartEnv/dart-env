@@ -19,7 +19,7 @@ class PointReachEnv(gym.Env):
 
         self.randomize_initial_state = True
 
-        self.mass = 10.0
+        self.mass = 5.0
         self.mass_range = [0.2, 10.0]
 
         self.wind = np.array([0.0, 0.0])
@@ -54,6 +54,16 @@ class PointReachEnv(gym.Env):
         # self.warn_zones = [np.array([[-9.5, -3], [-9.5, 3], [9.5, 3], [9.5, -3]]),
         #                    np.array([[4.5, -7.5], [4.5, 7.5], [10.0, 7.5], [10.0, -7.5]])]
 
+        # no maze
+        self.safe_zones = []
+        self.warn_zones = []
+        # self.forbidden_zones = []
+        self.zone_orders = ['FORBIDDEN', 'WARN', 'SAFE']
+        self.safe_zones = [np.array([[-10.5, -10.5], [-10.5, 10.5], [10.5, 10.5], [10.5, -10.5]])]
+        self.warn_zones = [np.array([[-10.5, -10.5], [-10.5, 10.5], [10.5, 10.5], [10.5, -10.5]])]
+        self.forbidden_zones = [np.array([[-3, 3.0], [3, 3.0], [3, 2.0], [-3, 2.0]])]
+        self.targets = [np.array([0.0, 6.0])]
+
         # maze v1
         # self.safe_zones = [np.array([[-10.5, -10.5], [-10.5, 10.5], [10.5, 10.5], [10.5, -10.5]])]
         # self.warn_zones = [np.array([[3.5, -6.5], [3.5, 6.5], [8.5, 6.5], [8.5, -6.5]])]
@@ -61,16 +71,16 @@ class PointReachEnv(gym.Env):
         # self.zone_orders = ['FORBIDDEN', 'WARN', 'SAFE']  # from top to bottom
 
         # maze v2
-        self.init_pose = np.array([-7.0, -6.5, 0, 0])
-        self.targets = [np.array([-7.0, 6])]
-        self.safe_zones = [np.array([[-7.5, -7.5], [-7.5, -5.5], [7.5, -5.5], [7.5, -7.5]]),
-                           np.array([[7.5, -7.5], [7.5, 7.5], [5.5, 7.5], [5.5, -7.5]]),
-                           np.array([[-7.5, 7.5], [-7.5, 5.5], [7.5, 5.5], [7.5, 7.5]])]
-        self.warn_zones = [np.array([[-9, -9], [-9, -4], [9, -4], [9, -9]]),
-                           np.array([[9, -9], [9, 9], [4, 9], [4, -9]]),
-                           np.array([[-9, 9], [-9, 4], [9, 4], [9, 9]])]
-        self.forbidden_zones = [np.array([[-10.5, -10.5], [-10.5, 10.5], [10.5, 10.5], [10.5, -10.5]])]
-        self.zone_orders = ['SAFE', 'WARN', 'FORBIDDEN']  # from top to bottom
+        # self.init_pose = np.array([-7.0, -6.5, 0, 0])
+        # self.targets = [np.array([-7.0, 6])]
+        # self.safe_zones = [np.array([[-7.5, -7.5], [-7.5, -5.5], [7.5, -5.5], [7.5, -7.5]]),
+        #                    np.array([[7.5, -7.5], [7.5, 7.5], [5.5, 7.5], [5.5, -7.5]]),
+        #                    np.array([[-7.5, 7.5], [-7.5, 5.5], [7.5, 5.5], [7.5, 7.5]])]
+        # self.warn_zones = [np.array([[-9, -9], [-9, -4], [9, -4], [9, -9]]),
+        #                    np.array([[9, -9], [9, 9], [4, 9], [4, -9]]),
+        #                    np.array([[-9, 9], [-9, 4], [9, 4], [9, 9]])]
+        # self.forbidden_zones = [np.array([[-10.5, -10.5], [-10.5, 10.5], [10.5, 10.5], [10.5, -10.5]])]
+        # self.zone_orders = ['SAFE', 'WARN', 'FORBIDDEN']  # from top to bottom
 
     # whether the agent is in safe zone
     def in_safe_zones(self):

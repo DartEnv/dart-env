@@ -124,7 +124,7 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
 
         self.soft_ground = False
         self.soft_foot = False
-        self.task_mode = self.STEPPING
+        self.task_mode = self.CONSTANT
         self.side_walk = False
 
         if self.gyro_only_mode:
@@ -1091,7 +1091,6 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
         reward += current_forward_reward * np.clip((xpos_after - xpos_before) / self.dt, -self.velocity_clip,
                                                 self.velocity_clip)
 
-
         reward -= self.comvel_pen * np.linalg.norm(self.robot_skeleton.dC)
         reward -= self.compos_pen * np.linalg.norm(self.init_q[3:6] - self.robot_skeleton.q[3:6])
 
@@ -1106,6 +1105,7 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
         low_lim_violate = np.sum(self.robot_skeleton.q[14:] - self.robot_skeleton.q_lower[14:] <= 0.08)
         high_lim_violate = np.sum(self.robot_skeleton.q[14:] - self.robot_skeleton.q_upper[14:] >= -0.08)
         reward -= (low_lim_violate + high_lim_violate)
+        # print(low_lim_violate + high_lim_violate)
 
         s = self.state_vector()
         done = not (np.isfinite(s).all() and (np.abs(s[2:]) < 200).all())

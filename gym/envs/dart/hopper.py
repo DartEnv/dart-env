@@ -408,7 +408,8 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         else:
             a = self.action_buffer[-self.act_delay - 1]
 
-        a = self.action_filter.filter_action(a)
+        if self.butterworth_filter:
+            a = self.action_filter.filter_action(a)
 
         # else:
         #     print("1")

@@ -61,7 +61,7 @@ class MiniCarEnv(gym.Env):
         # self.forbidden_zones = [np.array([[5, -5.0], [5, 5.0], [7, 5.0], [7, -5.0]])]
         # self.zone_orders = ['FORBIDDEN', 'WARN', 'SAFE']  # from top to bottom
 
-        # maze v2
+        # # maze v2
         self.init_pose = np.array([-7.0, -6.5, 0, 0])
         self.targets = [np.array([-7.0, 6])]
         self.safe_zones = [np.array([[-7.5, -7.5], [-7.5, -5.5], [7.5, -5.5], [7.5, -7.5]]),
@@ -72,6 +72,9 @@ class MiniCarEnv(gym.Env):
                            np.array([[-9, 9], [-9, 4], [9, 4], [9, 9]])]
         self.forbidden_zones = [np.array([[-10.5, -10.5], [-10.5, 10.5], [10.5, 10.5], [10.5, -10.5]])]
         self.zone_orders = ['SAFE', 'WARN', 'FORBIDDEN']  # from top to bottom
+
+
+        self.cur_step = 0
 
     # whether the agent is in safe zone
     def in_safe_zones(self):
@@ -159,16 +162,16 @@ class MiniCarEnv(gym.Env):
         if self.in_warn_zones():
             action *= 1.0
 
-        rew_before = self.computer_rew()
-
-        self.state[2:] += action * self.dt / self.mass + self.wind
+        # self.state[2:] += action * self.dt / self.mass + self.wind
 
         cur_vel = np.linalg.norm(self.state[2:])
         cur_vel += action[0] * self.dt / self.mass  # put gas or break
         cur_vel = np.clip(cur_vel, -0.7, 0.7)
+        if abs(cur_vel) < 0.1:
+            cur_vel = 0.1 * np.sign(cur_vel)
 
         cur_ori = self.state[2:] / np.linalg.norm(self.state[2:])
-        rot = action[1] * 0.6
+        rot = action[1] * 0.25
         cur_ori = np.array([np.cos(rot) * cur_ori[0] - np.sin(rot) * cur_ori[1], np.sin(rot) * cur_ori[0] + np.cos(rot) * cur_ori[1]])
         self.state[2:] = cur_ori * cur_vel
 
@@ -177,7 +180,10 @@ class MiniCarEnv(gym.Env):
 
         rew_after = self.computer_rew()
 
-        reward = rew_after - rew_before# - np.sum(np.abs(action)) * 1.0
+        if self.cur_step > 500:
+            reward = rew_after - np.sum(np.abs(action)) * 0.1
+        else:
+            reward = 0.0
 
         done = False
 
@@ -206,6 +212,8 @@ class MiniCarEnv(gym.Env):
         if self.input_target:
             obs = np.concatenate([obs, self.targets[0] / 10.0])
 
+        self.cur_step += 1
+
         return obs, reward, done, {}
 
     def reset(self):
@@ -233,6 +241,8 @@ class MiniCarEnv(gym.Env):
 
         if self.input_target:
             obs = np.concatenate([obs, self.targets[0] / 10.0])
+
+        self.cur_step = 0
 
         return obs
 
