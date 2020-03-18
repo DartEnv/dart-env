@@ -24,7 +24,7 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         self.input_time = False
         self.two_pose_input = False  # whether to use two q's instead of q and dq
 
-        self.butterworth_filter = True
+        self.butterworth_filter = False
 
         self.randomize_history_input = False
         self.history_buffers = []
