@@ -158,6 +158,20 @@ class DartWalker2dEnv(dart_env.DartEnv, utils.EzPickle):
     def pre_advance(self):
         self.posbefore = self.robot_skeleton.q[0]
 
+    def check_fall_on_ground(self):
+        fog = False
+        contacts = self.dart_world.collision_result.contacts
+        total_force_mag = 0
+        permitted_contact_bodies = [self.dart_world.skeletons[0].bodynodes[0], self.robot_skeleton.bodynodes[-1],
+                                    self.robot_skeleton.bodynodes[-4]]
+        for contact in contacts:
+            total_force_mag += np.square(contact.force).sum()
+            if contact.skel_id1 != self.robot_skeleton.id and contact.skel_id2 != self.robot_skeleton.id:
+                continue
+            if contact.bodynode1 not in permitted_contact_bodies and contact.bodynode2 not in permitted_contact_bodies:
+                fog = True
+        return fog
+
     def terminated(self):
         s = self.state_vector()
         height = self.robot_skeleton.bodynodes[2].com()[1]

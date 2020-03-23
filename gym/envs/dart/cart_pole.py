@@ -7,6 +7,14 @@ class DartCartPoleEnv(dart_env.DartEnv, utils.EzPickle):
         control_bounds = np.array([[1.0],[-1.0]])
         self.action_scale = 100
         dart_env.DartEnv.__init__(self, 'cartpole.skel', 2, 4, control_bounds, dt=0.02, disableViewer=True)
+
+        for world in self.dart_worlds:
+            for skeleton in world.skeletons:
+                for jt in range(0, len(skeleton.joints)):
+                    for dof in range(len(skeleton.joints[jt].dofs)):
+                        if skeleton.joints[jt].has_position_limit(dof):
+                            skeleton.joints[jt].set_position_limit_enforced(False)
+
         utils.EzPickle.__init__(self)
 
     def step(self, a):

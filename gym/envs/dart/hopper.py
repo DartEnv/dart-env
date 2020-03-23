@@ -16,10 +16,10 @@ from gym import error, spaces
 class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
     def __init__(self):
         self.control_bounds = np.array([[1.0, 1.0, 1.0], [-1.0, -1.0, -1.0]])
-        self.action_scale = np.array([200.0, 200.0, 200.0]) * 1.0
+        self.action_scale = np.array([200.0, 200.0, 200.0]) * 0.4
         self.train_UP = False
         self.velrew_input = False
-        self.noisy_input = True
+        self.noisy_input = False
         self.randomize_initial_state = True
         self.input_time = False
         self.two_pose_input = False  # whether to use two q's instead of q and dq
@@ -33,6 +33,7 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
 
         self.staged_reward = False
         self.learn_getup = False
+        self.learn_alive = False
 
         self.sparse_reward = False
 
@@ -69,7 +70,7 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         self.fallstates = []
 
         self.terminate_for_not_moving \
-            = [1.0, 1.5]  # [distance, time], need to mvoe distance in time
+            = None#[1.0, 1.5]  # [distance, time], need to mvoe distance in time
 
         self.action_filtering = 0  # window size of filtering, 0 means no filtering
         self.action_filter_cache = []
@@ -100,6 +101,8 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
 
         self.periodic_noise = False
         self.periodic_noise_params = [0.1, 4.5]  # magnitude, frequency
+
+        self.joint_works = []
 
         self.learnable_perturbation = False
         self.learnable_perturbation_list = [['h_shin', 80, 0]]  # [bodynode name, force magnitude, torque magnitude
@@ -251,6 +254,10 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
             self.height_threshold_low = 0.0
             self.rot_threshold = 100000
 
+            self.bodynode_coms = [bn.C for bn in self.robot_skeleton.bodynodes[2:]]
+            for i in range(len(self.bodynode_coms)-1, -1, -1):
+                self.bodynode_coms[i][0] -= self.bodynode_coms[0][0]
+
         if self.learn_goto is not None:
             self.terminate_for_not_moving = None
 
@@ -276,7 +283,7 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
             self.joint_upper_lim += expand
 
         if self.butterworth_filter:
-            self.action_filter = ActionFilter(self.act_dim, 3, int(1.0/self.dt), low_cutoff=0.0, high_cutoff=4.0)
+            self.action_filter = ActionFilter(self.act_dim, 3, int(1.0/self.dt), low_cutoff=0.0, high_cutoff=8.0)
 
         utils.EzPickle.__init__(self)
 
@@ -395,6 +402,7 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
                 self.robot_skeleton.set_forces(tau[_])
             else:
                 self.robot_skeleton.set_forces(tau)
+            self.joint_works += np.abs(tau * np.array(self.robot_skeleton.dq) * self.sim_dt)
             self.dart_world.step()
         if self.pid_controller is not None:
             self.average_torque = np.mean(average_torque, axis=0)
@@ -440,6 +448,21 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
     def post_advance(self):
         self.dart_world.check_collision()
 
+    def check_fall_on_ground(self):
+        fog = False
+        contacts = self.dart_world.collision_result.contacts
+        total_force_mag = 0
+        permitted_contact_bodies = [self.dart_world.skeletons[0].bodynodes[1],
+                                    self.dart_world.skeletons[0].bodynodes[2], self.robot_skeleton.bodynodes[-1],
+                                    self.robot_skeleton.bodynodes[-2]]
+        for contact in contacts:
+            total_force_mag += np.square(contact.force).sum()
+            if contact.skel_id1 != self.robot_skeleton.id and contact.skel_id2 != self.robot_skeleton.id:
+                continue
+            if contact.bodynode1 not in permitted_contact_bodies and contact.bodynode2 not in permitted_contact_bodies:
+                fog = True
+        return fog
+
     def terminated(self):
         '''if self.cur_step * self.dt > self.short_perturb_params[0] and \
                 self.cur_step * self.dt < self.short_perturb_params[1] + 2: # allow 2 seconds to recover
@@ -449,16 +472,7 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
             self.height_threshold_low = 0.56 * self.initial_coms[2][1]
             self.rot_threshold = 0.4'''
 
-        self.fall_on_ground = False
-        contacts = self.dart_world.collision_result.contacts
-        total_force_mag = 0
-        permitted_contact_bodies = [self.dart_world.skeletons[0].bodynodes[1], self.dart_world.skeletons[0].bodynodes[2], self.robot_skeleton.bodynodes[-1], self.robot_skeleton.bodynodes[-2]]
-        for contact in contacts:
-            total_force_mag += np.square(contact.force).sum()
-            if contact.skel_id1 != self.robot_skeleton.id and contact.skel_id2 != self.robot_skeleton.id:
-                continue
-            if contact.bodynode1 not in permitted_contact_bodies and contact.bodynode2 not in permitted_contact_bodies:
-                self.fall_on_ground = True
+        self.fall_on_ground = self.check_fall_on_ground()
 
         s = self.state_vector()
         height = self.robot_skeleton.bodynodes[2].com()[1]
@@ -482,6 +496,10 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         if self.learn_getup:
             if self.cur_step > 300:
                 done = True
+        if self.learn_alive:
+            done = not (np.isfinite(s).all() and (np.abs(s[2:]) < 100).all() and (
+                    np.abs(self.robot_skeleton.dq) < 100).all() \
+                    and not self.fall_on_ground)
 
         return done
 
@@ -536,7 +554,13 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
                 reward = 0.3 - 0.5*np.sum(np.abs(np.array(self.robot_skeleton.q)[1:]))
 
         if self.learn_getup:
-            reward = 1.0 - 0.5 * np.sum(np.abs(np.array(self.robot_skeleton.q)[1:]))
+            cur_bodynode_coms = [bn.C for bn in self.robot_skeleton.bodynodes[2:]]
+            for i in range(len(cur_bodynode_coms) - 1, -1, -1):
+                cur_bodynode_coms[i][0] -= cur_bodynode_coms[0][0]
+
+            reward = 3.0
+            for b in range(len(cur_bodynode_coms)):
+                reward -= np.linalg.norm(cur_bodynode_coms[b] - self.bodynode_coms[b])
 
         vrew = (posafter - self.posbefore) / self.dt * self.velrew_weight
         abrew = self.alive_bonus * step_skip
@@ -552,6 +576,9 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         #     if self.current_quant_budget == 0:
         #         reward -= 1.0
             # reward += self.current_quant_budget / self.max_quant_budget * 2.0 #0.0 * (np.exp(-7*self.quantization_param[2])-np.exp(-7))
+
+        if self.learn_alive:
+            reward = 1.0
 
         return reward
 
@@ -668,6 +695,7 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         envinfo['gait_frequency'] = self.gait_freq
         envinfo['xdistance'] = self.robot_skeleton.q[0]
         envinfo['pose'] = prev_pose
+
 
         return ob, reward, done, envinfo
 
@@ -807,9 +835,28 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         # qvel[2] = np.random.uniform(-1.0, 1.0)
 
         if self.learn_getup:
-            qpos[1] = -0.5
-            qpos[2] = 1.0
-            qpos[5] = 0.5
+            # qpos[2] = np.random.uniform(-0.7, 0.7)
+            if np.random.random() > 0.5:
+                qpos[2] = np.random.uniform(0.6, 1.2)
+            else:
+                qpos[2] = np.random.uniform(-0.6, -1.2)
+            qpos[5] = np.random.uniform(0.0, 1.0)
+            qpos[1] = -1.0
+            self.set_state(qpos, qvel)
+            while self.robot_skeleton.bodynodes[-1].C[1] < 0.1:
+                qpos[1] += 0.01
+                self.set_state(qpos, qvel)
+
+        if self.learn_alive:
+            if np.random.random() > 0.5:
+                qpos[2] = np.random.uniform(0.6, 0.7)
+            else:
+                qpos[2] = np.random.uniform(-0.6, -0.7)
+            qpos[5] = np.random.uniform(0.0, 1.0)
+            self.set_state(qpos, qvel)
+            while self.robot_skeleton.bodynodes[-1].C[1] < 0.1:
+                qpos[1] += 0.05
+                self.set_state(qpos, qvel)
 
         if self.quantized_observation:
             self.current_quant_budget = self.max_quant_budget
@@ -882,6 +929,8 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
             self.hidden_states = np.zeros(self.pseudo_lstm_dim * 2)
 
         self.accumulated_reward = 0
+
+        self.joint_works = np.zeros(len(self.robot_skeleton.dq))
 
         if self.butterworth_filter:
             self.action_filter.reset_filter()

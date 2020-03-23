@@ -39,6 +39,8 @@ class DartHopper8LinkEnv(dart_env.DartEnv, utils.EzPickle):
 
         dart_env.DartEnv.__init__(self, 'hopper_multilink/hopperid_8link.skel', 4, obs_dim, self.control_bounds, disableViewer=True)
 
+        self.init_height = self.robot_skeleton.bodynodes[2].com()[1]
+
         if self.randomize_dynamics:
             self.bodynode_original_masses = []
             self.bodynode_original_frictions = []
