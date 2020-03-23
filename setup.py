@@ -16,10 +16,7 @@ extras = {
 }
 
 # Meta dependency groups.
-all_deps = []
-for group_name in extras:
-    all_deps += extras[group_name]
-extras['all'] = all_deps
+extras['all'] = [item for group in extras.values() for item in group]
 
 setup(name='gym',
       version=VERSION,
@@ -32,7 +29,8 @@ setup(name='gym',
                 if package.startswith('gym')],
       zip_safe=False,
       install_requires=[
-          'numpy>=1.10.4', 'requests>=2.0', 'six', 'pyglet>=1.2.0',
+          'scipy', 'numpy>=1.10.4', 'six', 'pyglet>=1.4.0,<=1.5.0', 'cloudpickle>=1.2.0,<1.4.0',
+          'enum34~=1.1.6;python_version<"3.4"',
       ],
       extras_require=extras,
       package_data={'gym': [
@@ -46,4 +44,12 @@ setup(name='gym',
         'envs/robotics/assets/textures/*.png']
       },
       tests_require=['pytest', 'mock'],
+      python_requires='>=3.5',
+      classifiers=[
+          'Programming Language :: Python :: 3',
+          'Programming Language :: Python :: 3.5',
+          'Programming Language :: Python :: 3.6',
+          'Programming Language :: Python :: 3.7',
+          'Programming Language :: Python :: 3.8',
+      ],
 )
