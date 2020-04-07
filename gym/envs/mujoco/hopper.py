@@ -8,10 +8,12 @@ class HopperEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         self.train_UP = False
         self.noisy_input = False
 
+        self.relaxed_bound = True
+
         self.resample_MP = False  # whether to resample the model paraeters
         self.param_manager = mjHopperManager(self)
         self.velrew_weight = 1
-        self.velrew_input = False
+        self.velrew_input = True
         self.two_pose_input = False
         self.previous_pose = np.zeros(5)
         self.input_time = False
@@ -21,7 +23,7 @@ class HopperEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         self.randomize_history_input = False
         self.history_buffers = []
 
-        self.terminate_for_not_moving = [0.5, 1.0]
+        self.terminate_for_not_moving = None#[0.5, 1.0]
 
         self.pid_controller = None#[250, 25]
         if self.pid_controller is not None:
@@ -91,7 +93,12 @@ class HopperEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         s = self.state_vector()
         height, ang = self.sim.data.qpos[1:3]
         done = not (np.isfinite(s).all() and (np.abs(s[2:]) < 100).all() and
-                    (height > .7) and (abs(ang) < .8))
+                    (height > .7) and (abs(ang) < .4))
+        if self.relaxed_bound:
+            done = not (np.isfinite(s).all() and (np.abs(s[2:]) < 100).all() and
+                        (height > .4) and (abs(ang) < 1.0))
+
+
         if self.cur_step >= self.horizon:
             done = True
 
@@ -100,6 +107,7 @@ class HopperEnv(mujoco_env.MujocoEnv, utils.EzPickle):
                     (np.abs(s[0]) < self.terminate_for_not_moving[0] or
                      s[0] * self.velrew_weight < 0):
                 done = True
+
 
         return done
 
@@ -115,7 +123,7 @@ class HopperEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         joint_limit_penalty = 0
         if np.abs(self.sim.data.qpos[-2]) < 0.05:
             joint_limit_penalty += 1.5
-        reward -= 5e-1 * joint_limit_penalty
+        # reward -= 5e-1 * joint_limit_penalty
         if self.use_sparse_reward:
             self.total_reward += reward
             reward = 0.0
@@ -152,6 +160,8 @@ class HopperEnv(mujoco_env.MujocoEnv, utils.EzPickle):
             self.sim.data.qpos.flat[1:],
             self.sim.data.qvel.flat
         ])
+
+        state[1] = (state[1] + np.pi) % (2 * np.pi) - np.pi
 
         if self.two_pose_input:
             state = np.concatenate([
@@ -215,7 +225,6 @@ class HopperEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         # qpos[1] -= 0.5
         # qpos[2] = 1.0
         # qpos[5] = 0.5
-
 
         self.set_state(qpos, qvel)
 

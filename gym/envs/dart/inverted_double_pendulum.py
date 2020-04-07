@@ -24,8 +24,8 @@ class DartDoubleInvertedPendulumEnv(dart_env.DartEnv, utils.EzPickle):
         dart_env.DartEnv.__init__(self, 'inverted_double_pendulum.skel', 2, obs_dim, self.control_bounds, dt=0.005, disableViewer=True)
         utils.EzPickle.__init__(self)
 
-    def _step(self, a):
-        reward = 2.0
+    def step(self, a):
+        reward = 0.0
 
         clamped_control = np.copy(a)
         for i in range(len(clamped_control)):
@@ -57,7 +57,7 @@ class DartDoubleInvertedPendulumEnv(dart_env.DartEnv, utils.EzPickle):
                 query = self.transition_locator.kneighbors([np.concatenate([cur_state, cur_act])])
                 dist = query[0][0][0]
                 self.total_dist.append(dist)
-                #print('distance: ', dist)
+
                 ind = query[1][0][0]
                 base_state_act = self.transition_locator._fit_X[ind]
                 if dist > 2.0:
@@ -79,7 +79,7 @@ class DartDoubleInvertedPendulumEnv(dart_env.DartEnv, utils.EzPickle):
             reward += 5
 
         notdone = np.isfinite(ob).all()
-        done = not notdone or abs(self.robot_skeleton.q[0]) > 2.0
+        done = not notdone# or abs(self.robot_skeleton.q[0]) > 2.0
 
         if self.dyn_model_id != 0:
             reward *= 1.0

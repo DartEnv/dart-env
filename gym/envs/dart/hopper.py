@@ -16,10 +16,10 @@ from gym import error, spaces
 class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
     def __init__(self):
         self.control_bounds = np.array([[1.0, 1.0, 1.0], [-1.0, -1.0, -1.0]])
-        self.action_scale = np.array([200.0, 200.0, 200.0]) * 0.4
+        self.action_scale = np.array([200.0, 200.0, 200.0]) * 1.0
         self.train_UP = False
-        self.velrew_input = False
-        self.noisy_input = False
+        self.velrew_input = True
+        self.noisy_input = True
         self.randomize_initial_state = True
         self.input_time = False
         self.two_pose_input = False  # whether to use two q's instead of q and dq
@@ -117,8 +117,10 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         self.energy_penalty = 1e-3
         self.action_bound_penalty = 1.0
 
+        self.height_reward = 0.0
+
         self.UP_noise_level = 0.0
-        self.resample_MP = False  # whether to resample the model paraeters
+        self.resample_MP = True  # whether to resample the model paraeters
 
         self.actuator_nonlinearity = False
         self.actuator_nonlin_coef = 1.0
@@ -207,13 +209,13 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         self.param_manager.set_simulator_parameters(self.current_param)
 
         self.height_threshold_low = 0.56 * self.robot_skeleton.bodynodes[2].com()[1]
-        self.rot_threshold = 0.4
+        self.rot_threshold = 0.8
 
         if self.staged_reward:
             self.rot_threshold = 1.0
             self.height_threshold_low = 0.36 * self.robot_skeleton.bodynodes[2].com()[1]
 
-        self.short_perturb_params = []  # [1.0, 1.3, np.array([-200, 0, 0])] # start time, end time, force
+        self.short_perturb_params = [] #[1.0, 1.3, np.array([-80, 0, 0])] # start time, end time, force
 
         print('sim parameters: ', self.param_manager.get_simulator_parameters())
         self.current_param = self.param_manager.get_simulator_parameters()
@@ -238,9 +240,11 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         if self.learn_backflip:
             self.velrew_weight = 0.0
             self.angvel_rew = 1.0
+            self.angvel_clip = 100.0
             self.height_threshold_low = 0.26 * self.robot_skeleton.bodynodes[2].com()[1]
             self.rot_threshold = 100000
-            self.noisy_input = False
+            self.noisy_input = True
+            self.height_reward = 2.0
 
         if self.learn_jump:
             self.velrew_weight = 0.0
@@ -501,6 +505,11 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
                     np.abs(self.robot_skeleton.dq) < 100).all() \
                     and not self.fall_on_ground)
 
+        # if done:
+        #     print("Terminated due to: ", (np.abs(s[2:]) < 100).all(), (
+        #             np.abs(self.robot_skeleton.dq) < 100).all(), not self.fall_on_ground, (height > self.height_threshold_low),
+        #           (abs(ang) < self.rot_threshold))
+
         return done
 
     def pre_advance(self):
@@ -517,6 +526,7 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
             if (self.robot_skeleton.q_upper[j] - self.robot_skeleton.q[j]) < 0.05:
                 joint_limit_penalty += abs(1.5)
         reward = (posafter - self.posbefore) / self.dt * self.velrew_weight
+        # reward = np.clip(reward, -100.0, 2.0)
 
         if self.learn_goto is not None:
             reward = 0
@@ -540,8 +550,8 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
             reward -= self.energy_penalty * np.square(self.average_torque / 200.0).sum()
 
         reward -= 5e-1 * joint_limit_penalty
-        reward -= np.abs(self.robot_skeleton.q[2])
         reward -= self.height_penalty * np.clip(self.robot_skeleton.dq[1], 0.0, 1e10)
+        reward += self.height_reward * (self.robot_skeleton.q[1] - 0.7)
 
         reward = np.clip(reward, -np.inf, self.reward_clipping)
 
@@ -641,7 +651,7 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         #     mult = 0.94
         #     self.action_scale = np.array([200.0 * mult, 200.0 * mult, 200.0 * mult, 1.0])
 
-        done = self.terminated() or self.cur_step >= 999
+        done = self.terminated()# or self.cur_step >= 999
 
         if self.sparse_reward:
             if done:
@@ -706,6 +716,8 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         ])
         # state = np.array(self.robot_skeleton.q[1:])
         state[0] = self.robot_skeleton.bodynodes[2].com()[1]
+
+        state[1] = (state[1] + np.pi) % (2 * np.pi) - np.pi
 
         if self.two_pose_input:
             self.pose_history.append(np.copy(self.robot_skeleton.q))
@@ -943,6 +955,7 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
     def state_vector(self):
         s = np.copy(np.concatenate([self.robot_skeleton.q, self.robot_skeleton.dq]))
         s[1] += self.zeroed_height
+
         return s
 
     def set_state_vector(self, s):

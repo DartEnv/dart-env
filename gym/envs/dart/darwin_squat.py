@@ -47,7 +47,7 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
         self.input_contact_bin = False
         self.num_contact_bin = 4
 
-        self.input_range_sensor = True
+        self.input_range_sensor = False
         self.range_sensor_param = [0.1, 10]  # radius from the foot center, number of sensors
 
         self.variation_scheduling = None#[[0.0, {'obstacle_height_range': 0.003}], [1.0, {'obstacle_height_range': 0.003}]]
@@ -101,13 +101,13 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
         self.joint_vel_limit = 20000.0
         self.train_UP = False
         self.noisy_input = True
-        self.resample_MP = False
+        self.resample_MP = True
         self.range_robust = 0.05 # std to sample at each step
         self.randomize_timestep = True
         self.randomize_action_delay = True
         self.load_keyframe_from_file = True
         self.randomize_gravity_sch = False
-        self.randomize_obstacle = True
+        self.randomize_obstacle = False
         self.randomize_gyro_bias = True
         self.use_zeroed_gyro = True
         self.gyro_bias = np.array([0.0, 0.0])
@@ -124,7 +124,7 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
 
         self.soft_ground = False
         self.soft_foot = False
-        self.task_mode = self.CONSTANT
+        self.task_mode = self.STEPPING
         self.side_walk = False
 
         if self.gyro_only_mode:
@@ -505,7 +505,7 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
             self.setup_constref()
 
         if self.butterworth_filter:
-            self.action_filter = ActionFilter(self.act_dim, 3, int(1.0/self.dt), low_cutoff=0.0, high_cutoff=6.0)
+            self.action_filter = ActionFilter(self.act_dim, 3, int(1.0/self.dt), low_cutoff=0.0, high_cutoff=10.0)
 
         # self.set_robot_optimization_parameters(np.array([-0.27573608, -0.04001381,  0.16576692, -0.45604828,  0.83507119,
         # 0.2363036 , -0.37442629, -0.77073466,  0.69862929, -0.85059406]) * 0.01)
@@ -555,7 +555,7 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
             #rig_keyframe = [HW2SIM_INDEX(v) for v in VAL2RADIAN(rig_keyframe)]
             #self.interp_sch = [[0.0, rig_keyframe[0]]]
             interp_time = 0.2
-            for i in range(1):
+            for i in range(3):
                 for k in range(0, len(rig_keyframe)):
                     self.interp_sch.append([interp_time, rig_keyframe[k]])
                     interp_time += 0.03
@@ -576,7 +576,7 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
         self.interp_sch = [[0.0, const_pose], [8.0, const_pose]]
         self.compos_range = 0.5
         self.forward_reward = 10.0
-        self.delta_angle_scale = 0.6
+        self.delta_angle_scale = 0.5
         if self.use_settled_initial_states:
             self.init_states_candidates = np.loadtxt(
                 os.path.join(os.path.dirname(__file__), "assets", 'darwinmodel/halfsquat_init.txt'))
@@ -809,6 +809,11 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
 
         cur_target = self.ref_target + clamped_control * self.delta_angle_scale
 
+        # MMHACK
+        # randomly reset the filter cache
+        if np.random.random() < 0.02:
+            self.reset_filtering()
+
         cur_target = self.action_filter.filter_action(cur_target)
 
         self.action_filter_cache.append(cur_target)
@@ -818,7 +823,6 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
             cur_target = np.mean(self.action_filter_cache, axis=0)
 
         cur_target = np.clip(cur_target, JOINT_LOW_BOUND, JOINT_UP_BOUND)
-
 
         self.apply_target_pose(cur_target)
 
@@ -1179,7 +1183,7 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
         # if np.abs(self.robot_skeleton.C[0]) > 0.1:
         #     done = True
 
-        ob = self._get_obs()
+        ob = self._get_obs(update_buffer=True)
 
         # move the obstacle forward when the robot has passed it
         horizontal_range = [-0.0, 0.0]
@@ -1221,136 +1225,134 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
 
         return ob, reward, done, info
 
-    def _get_obs(self, update_buffer=True):
-        # phi = np.array([self.count/self.ref_traj.shape[0]])
-        # print(ContactList.shape)
-        state = np.concatenate([np.array(self.robot_skeleton.q)[self.observed_dof_ids], np.array(self.robot_skeleton.dq)[self.observed_dof_ids]])
-        if self.multipos_obs > 0:
-            if self.streaming_mode:
-                state = self.state_cache[0]
-            else:
-                state = np.array(self.robot_skeleton.q)[self.observed_dof_ids]
-
-            self.obs_cache.append(state)
-            while len(self.obs_cache) < self.multipos_obs:
-                self.obs_cache.append(state)
-            if len(self.obs_cache) > self.multipos_obs:
-                self.obs_cache.pop(0)
-
-            for i in range(len(self.obs_cache)-1):
-                if self.input_obs_difference:
-                    if self.input_difference_sign:
-                        state = np.concatenate([np.sign(self.obs_cache[i] - self.obs_cache[-1]), state])
-                    else:
-                        state = np.concatenate([(self.obs_cache[i] - self.obs_cache[-1])/self.dt, state])
-                else:
-                    state = np.concatenate([self.obs_cache[i], state])
-
-        for i in range(self.future_ref_pose):
-            state = np.concatenate([state, self.get_ref_pose(self.t + self.dt * (i+1))])
-
-        if self.gyro_only_mode:
-            state = np.array([])
-
-        if self.root_input:
-            if self.streaming_mode:
-                gyro = self.gyro_cache[0]
-            else:
-                gyro = self.get_sim_bno55()
-            if not self.include_heading:
-                gyro = np.array([gyro[0], gyro[1], self.last_root[0], self.last_root[1]])
-                self.last_root = [gyro[0], gyro[1]]
-            else:
-                adjusted_heading = (gyro[2] - self.initial_heading) % (2*np.pi)
-                adjusted_heading = adjusted_heading - 2*np.pi if adjusted_heading > np.pi else adjusted_heading
-                gyro = np.array([gyro[0], gyro[1], adjusted_heading, self.last_root[0], self.last_root[1], self.last_root[2]])
-                if self.use_zeroed_gyro:
-                    gyro[0:2] -= self.initial_gyro[0:2]
-                    gyro[0:2] += self.gyro_bias
-                self.last_root = [gyro[0], gyro[1], adjusted_heading]
-            state = np.concatenate([state, gyro])
-
-        if self.noisy_input and not self.supress_all_randomness:
-            state = state + np.random.normal(0, .01, len(state))
-        if self.fallstate_input:
-            state = np.concatenate([state, self.falling_state()])
-
-        if self.transition_input:
-            if self.t < 1.0:
-                state = np.concatenate([state, [0]])
-            else:
-                state = np.concatenate([state, [1]])
-
-        if self.task_mode == self.BONGOBOARD:
-            board_ori = np.array(euler_from_matrix(self.dart_world.skeletons[4].bodynode('board').T[0:3, 0:3], 'sxyz'))
-            state = np.concatenate([state, board_ori])
-
-        if self.input_leg_tracking_error:
-            cur_leg_pose = np.array(self.robot_skeleton.q)[self.observed_dof_ids]
-            target_leg_pose = self.target[np.array(self.observed_dof_ids)-6]
-            leg_tracking_index = len(state)
-            state = np.concatenate([state, (cur_leg_pose)])
-
-        if self.input_contact_bin:
-            contacts = self.dart_world.collision_result.contacts
-            left_foot_contact_bin = np.zeros(self.num_contact_bin)
-            right_foot_contact_bin = np.zeros(self.num_contact_bin)
-
-            for contact in contacts:
-                if contact.skel_id1 != self.robot_skeleton.id and contact.skel_id2 != self.robot_skeleton.id:
-                    continue
-                for shoe_id in range(len(self.left_foot_shoe_bodies)):
-                    if contact.bodynode1 == self.left_foot_shoe_bodies[shoe_id] or contact.bodynode2 == self.left_foot_shoe_bodies[shoe_id]:
-                        left_foot_contact_bin[shoe_id] = 1.0
-                for shoe_id in range(len(self.right_foot_shoe_bodies)):
-                    if contact.bodynode1 == self.right_foot_shoe_bodies[shoe_id] or contact.bodynode2 == \
-                            self.right_foot_shoe_bodies[shoe_id]:
-                        right_foot_contact_bin[shoe_id] = 1.0
-
-            for bin_id in range(self.num_contact_bin):
-                if left_foot_contact_bin[bin_id] == 1:
-                    self.left_foot_shoe_bodies[bin_id].shapenodes[0].set_visual_aspect_rgba([0.5, 0.5, 1.0, 1.0])
-                else:
-                    self.left_foot_shoe_bodies[bin_id].shapenodes[0].set_visual_aspect_rgba([0.9, 0.9, 0.0, 1.0])
-                if right_foot_contact_bin[bin_id] == 1:
-                    self.right_foot_shoe_bodies[bin_id].shapenodes[0].set_visual_aspect_rgba([0.5, 0.5, 1.0, 1.0])
-                else:
-                    self.right_foot_shoe_bodies[bin_id].shapenodes[0].set_visual_aspect_rgba([0.9, 0.9, 0.0, 1.0])
-
-            state = np.concatenate([state, left_foot_contact_bin, right_foot_contact_bin])
-
-        if self.input_range_sensor:
-            left_foot_range = np.zeros(self.range_sensor_param[1])
-            right_foot_range = np.zeros(self.range_sensor_param[1])
-
-            foot_samples_local = (np.arange(self.range_sensor_param[1]) / self.range_sensor_param[1] - 0.5) * self.range_sensor_param[0] * 2
-            left_foot_samples = [self.body_parts[-7].to_world([0, 0, p]) for p in foot_samples_local]
-            right_foot_samples = [self.body_parts[-1].to_world([0, 0, p]) for p in foot_samples_local]
-
-            obstacle_width = self.obstacle_bodynodes[1].shapenodes[0].shape.size()[0]
-            for obid in range(len(self.obstacle_bodynodes)):
-                obs_pos = self.obstacle_bodynodes[obid].shapenodes[0].offset()
-                obs_pos[2] += self.obstacle_bodynodes[obid].shapenodes[0].shape.size()[2] / 2.0
-                for l in range(len(left_foot_samples)):
-                    if left_foot_samples[l][0] > obs_pos[0] - obstacle_width / 2.0 and\
-                        left_foot_samples[l][0] < obs_pos[0] + obstacle_width / 2.0:
-                        left_foot_range[l] = left_foot_samples[l][2] - obs_pos[2]
-                for l in range(len(right_foot_samples)):
-                    if right_foot_samples[l][0] > obs_pos[0] - obstacle_width / 2.0 and\
-                        right_foot_samples[l][0] < obs_pos[0] + obstacle_width / 2.0:
-                        right_foot_range[l] = right_foot_samples[l][2] - obs_pos[2]
-            left_foot_range = np.clip(left_foot_range, 0.0, 0.2)
-            right_foot_range = np.clip(right_foot_range, 0.0, 0.2)
-            state = np.concatenate([state, left_foot_range, right_foot_range])
-
-        if self.adjustable_leg_compliance:
-            state = np.concatenate([state, [self.left_leg_compliance, self.right_leg_compliance]])
-
-        if self.train_UP:
-            #UP = self.param_manager.get_simulator_parameters()
-            state = np.concatenate([state, self.current_param])
-
+    def _get_obs(self, update_buffer=False):
         if update_buffer:
+            state = np.concatenate([np.array(self.robot_skeleton.q)[self.observed_dof_ids], np.array(self.robot_skeleton.dq)[self.observed_dof_ids]])
+            if self.multipos_obs > 0:
+                if self.streaming_mode:
+                    state = self.state_cache[0]
+                else:
+                    state = np.array(self.robot_skeleton.q)[self.observed_dof_ids]
+
+                self.obs_cache.append(state)
+                while len(self.obs_cache) < self.multipos_obs:
+                    self.obs_cache.append(state)
+                if len(self.obs_cache) > self.multipos_obs:
+                    self.obs_cache.pop(0)
+
+                for i in range(len(self.obs_cache)-1):
+                    if self.input_obs_difference:
+                        if self.input_difference_sign:
+                            state = np.concatenate([np.sign(self.obs_cache[i] - self.obs_cache[-1]), state])
+                        else:
+                            state = np.concatenate([(self.obs_cache[i] - self.obs_cache[-1])/self.dt, state])
+                    else:
+                        state = np.concatenate([self.obs_cache[i], state])
+
+            for i in range(self.future_ref_pose):
+                state = np.concatenate([state, self.get_ref_pose(self.t + self.dt * (i+1))])
+
+            if self.gyro_only_mode:
+                state = np.array([])
+
+            if self.root_input:
+                if self.streaming_mode:
+                    gyro = self.gyro_cache[0]
+                else:
+                    gyro = self.get_sim_bno55()
+                if not self.include_heading:
+                    gyro = np.array([gyro[0], gyro[1], self.last_root[0], self.last_root[1]])
+                    self.last_root = [gyro[0], gyro[1]]
+                else:
+                    adjusted_heading = (gyro[2] - self.initial_heading) % (2*np.pi)
+                    adjusted_heading = adjusted_heading - 2*np.pi if adjusted_heading > np.pi else adjusted_heading
+                    gyro = np.array([gyro[0], gyro[1], adjusted_heading, self.last_root[0], self.last_root[1], self.last_root[2]])
+                    if self.use_zeroed_gyro:
+                        gyro[0:2] -= self.initial_gyro[0:2]
+                        gyro[0:2] += self.gyro_bias
+                    self.last_root = [gyro[0], gyro[1], adjusted_heading]
+                state = np.concatenate([state, gyro])
+
+            if self.noisy_input and not self.supress_all_randomness:
+                state = state + np.random.normal(0, .01, len(state))
+            if self.fallstate_input:
+                state = np.concatenate([state, self.falling_state()])
+
+            if self.transition_input:
+                if self.t < 1.0:
+                    state = np.concatenate([state, [0]])
+                else:
+                    state = np.concatenate([state, [1]])
+
+            if self.task_mode == self.BONGOBOARD:
+                board_ori = np.array(euler_from_matrix(self.dart_world.skeletons[4].bodynode('board').T[0:3, 0:3], 'sxyz'))
+                state = np.concatenate([state, board_ori])
+
+            if self.input_leg_tracking_error:
+                cur_leg_pose = np.array(self.robot_skeleton.q)[self.observed_dof_ids]
+                target_leg_pose = self.target[np.array(self.observed_dof_ids)-6]
+                leg_tracking_index = len(state)
+                state = np.concatenate([state, (cur_leg_pose)])
+
+            if self.input_contact_bin:
+                contacts = self.dart_world.collision_result.contacts
+                left_foot_contact_bin = np.zeros(self.num_contact_bin)
+                right_foot_contact_bin = np.zeros(self.num_contact_bin)
+
+                for contact in contacts:
+                    if contact.skel_id1 != self.robot_skeleton.id and contact.skel_id2 != self.robot_skeleton.id:
+                        continue
+                    for shoe_id in range(len(self.left_foot_shoe_bodies)):
+                        if contact.bodynode1 == self.left_foot_shoe_bodies[shoe_id] or contact.bodynode2 == self.left_foot_shoe_bodies[shoe_id]:
+                            left_foot_contact_bin[shoe_id] = 1.0
+                    for shoe_id in range(len(self.right_foot_shoe_bodies)):
+                        if contact.bodynode1 == self.right_foot_shoe_bodies[shoe_id] or contact.bodynode2 == \
+                                self.right_foot_shoe_bodies[shoe_id]:
+                            right_foot_contact_bin[shoe_id] = 1.0
+
+                for bin_id in range(self.num_contact_bin):
+                    if left_foot_contact_bin[bin_id] == 1:
+                        self.left_foot_shoe_bodies[bin_id].shapenodes[0].set_visual_aspect_rgba([0.5, 0.5, 1.0, 1.0])
+                    else:
+                        self.left_foot_shoe_bodies[bin_id].shapenodes[0].set_visual_aspect_rgba([0.9, 0.9, 0.0, 1.0])
+                    if right_foot_contact_bin[bin_id] == 1:
+                        self.right_foot_shoe_bodies[bin_id].shapenodes[0].set_visual_aspect_rgba([0.5, 0.5, 1.0, 1.0])
+                    else:
+                        self.right_foot_shoe_bodies[bin_id].shapenodes[0].set_visual_aspect_rgba([0.9, 0.9, 0.0, 1.0])
+
+                state = np.concatenate([state, left_foot_contact_bin, right_foot_contact_bin])
+
+            if self.input_range_sensor:
+                left_foot_range = np.zeros(self.range_sensor_param[1])
+                right_foot_range = np.zeros(self.range_sensor_param[1])
+
+                foot_samples_local = (np.arange(self.range_sensor_param[1]) / self.range_sensor_param[1] - 0.5) * self.range_sensor_param[0] * 2
+                left_foot_samples = [self.body_parts[-7].to_world([0, 0, p]) for p in foot_samples_local]
+                right_foot_samples = [self.body_parts[-1].to_world([0, 0, p]) for p in foot_samples_local]
+
+                obstacle_width = self.obstacle_bodynodes[1].shapenodes[0].shape.size()[0]
+                for obid in range(len(self.obstacle_bodynodes)):
+                    obs_pos = self.obstacle_bodynodes[obid].shapenodes[0].offset()
+                    obs_pos[2] += self.obstacle_bodynodes[obid].shapenodes[0].shape.size()[2] / 2.0
+                    for l in range(len(left_foot_samples)):
+                        if left_foot_samples[l][0] > obs_pos[0] - obstacle_width / 2.0 and\
+                            left_foot_samples[l][0] < obs_pos[0] + obstacle_width / 2.0:
+                            left_foot_range[l] = left_foot_samples[l][2] - obs_pos[2]
+                    for l in range(len(right_foot_samples)):
+                        if right_foot_samples[l][0] > obs_pos[0] - obstacle_width / 2.0 and\
+                            right_foot_samples[l][0] < obs_pos[0] + obstacle_width / 2.0:
+                            right_foot_range[l] = right_foot_samples[l][2] - obs_pos[2]
+                left_foot_range = np.clip(left_foot_range, 0.0, 0.2)
+                right_foot_range = np.clip(right_foot_range, 0.0, 0.2)
+                state = np.concatenate([state, left_foot_range, right_foot_range])
+
+            if self.adjustable_leg_compliance:
+                state = np.concatenate([state, [self.left_leg_compliance, self.right_leg_compliance]])
+
+            if self.train_UP:
+                #UP = self.param_manager.get_simulator_parameters()
+                state = np.concatenate([state, self.current_param])
+
             self.observation_buffer.append(np.copy(state))
 
         final_obs = np.array([])
@@ -1506,7 +1508,7 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
 
         self.reward_terms = [0.0] * 9
 
-        return self._get_obs()
+        return self._get_obs(update_buffer=True)
 
     def resample_task(self):
         self.resample_MP = False
@@ -1565,3 +1567,33 @@ class DartDarwinSquatEnv(dart_env.DartEnv, utils.EzPickle):
 
     def get_curriculum(self):
         return self.variation_scheduling[0][1]['obstacle_height_range']
+
+    def state_vector(self):
+        obs_buffer = self.observation_buffer
+        if len(obs_buffer) > 10:
+            obs_buffer = self.observation_buffer[-10:]
+        return {'qpos':self.robot_skeleton.q, 'qvel':self.robot_skeleton.dq, 't':self.t,
+                'pose_cache':self.obs_cache, 'obs_buffer':obs_buffer, 'act_queue':self.action_queue}
+
+    def set_state_vector(self, s):
+        self.robot_skeleton.q = s['qpos']
+        self.robot_skeleton.dq = s['qvel']
+        self.t = s['t']
+        self.obs_cache = s['pose_cache']
+        self.observation_buffer = s['obs_buffer']
+        self.action_queue = s['act_queue']
+
+        self.reset_filtering()
+
+    def reset_filtering(self):
+        target = self.get_ref_pose(self.t)
+
+        if self.butterworth_filter:
+            self.action_filter.reset_filter(target)
+
+        self.action_filter_cache = []
+        for i in range(self.action_filtering):
+            self.action_filter_cache.append(target)
+
+
+

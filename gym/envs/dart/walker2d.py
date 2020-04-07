@@ -53,8 +53,8 @@ class DartWalker2dEnv(dart_env.DartEnv, utils.EzPickle):
 
         self.t = 0
 
-        self.include_obs_history = 1
-        self.include_act_history = 0
+        self.include_obs_history = 10
+        self.include_act_history = 9
         obs_dim *= self.include_obs_history
         obs_dim += len(self.control_bounds[0]) * self.include_act_history
 
@@ -178,6 +178,7 @@ class DartWalker2dEnv(dart_env.DartEnv, utils.EzPickle):
         ang = self.robot_skeleton.q[2]
         done = not (np.isfinite(s).all() and (np.abs(s[2:]) < 100).all() and
                    (height > .8) and (height < 2.0) and (abs(ang) < 1.0))
+
         lfooth = self.robot_skeleton.bodynode('h_foot_left').C[1]
         rfooth = self.robot_skeleton.bodynode('h_foot').C[1]
         #if lfooth > self.robot_skeleton.bodynode('h_thigh').C[1] or rfooth > self.robot_skeleton.bodynode('h_thigh_left').C[1]: # don't allow the feet to raise high
@@ -358,14 +359,14 @@ class DartWalker2dEnv(dart_env.DartEnv, utils.EzPickle):
 
     def reset_model(self):
         self.dart_world.reset()
-        qpos = self.robot_skeleton.q + self.np_random.uniform(low=-.00015, high=.00015, size=self.robot_skeleton.ndofs)
-        qvel = self.robot_skeleton.dq + self.np_random.uniform(low=-.00015, high=.00015, size=self.robot_skeleton.ndofs)
-        # if np.random.random() > 0.5:
-        #     qpos[3] += 0.1
-        # else:
-        #     qpos[6] += 0.1
-        #MMHACK
-        qpos[3] += 0.3
+        qpos = self.robot_skeleton.q + self.np_random.uniform(low=-.005, high=.005, size=self.robot_skeleton.ndofs)
+        qvel = self.robot_skeleton.dq + self.np_random.uniform(low=-.005, high=.005, size=self.robot_skeleton.ndofs)
+        if np.random.random() > 0.5:
+            qpos[3] += 0.3
+            qpos[6] -= 0.3
+        else:
+            qpos[6] += 0.3
+            qpos[3] -= 0.3
 
         self.set_state(qpos, qvel)
 

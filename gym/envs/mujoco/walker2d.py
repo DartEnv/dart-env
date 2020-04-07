@@ -9,6 +9,8 @@ class Walker2dEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         self.include_obs_history = 1
         self.include_act_history = 0
 
+        self.relaxed_bound = True
+
         obs_perm_base = np.array(
             [0.0001, 1, 5, 6, 7, 2, 3, 4, 8, 9, 10, 14, 15, 16, 11, 12, 13])
         act_perm_base = np.array([3, 4, 5, 0.0001, 1, 2])
@@ -75,8 +77,12 @@ class Walker2dEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         posafter, height, ang = self.sim.data.qpos[0:3]
         done = not (height > 0.8 and height < 2.0 and
                     ang > -1.0 and ang < 1.0)
+        if self.relaxed_bound:
+            done = not (height > 0.3 and height < 2.0 and
+                        ang > -1.6 and ang < 1.6)
         if self.cur_step >= self.horizon:
             done = True
+
         return done
 
     def step(self, a):
@@ -96,6 +102,7 @@ class Walker2dEnv(mujoco_env.MujocoEnv, utils.EzPickle):
 
         done = self.terminated()
         ob = self._get_obs()
+
         return ob, reward, done, {}
 
     def _get_obs(self, update_buffer=True):
@@ -123,15 +130,20 @@ class Walker2dEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         return final_obs
 
     def reset_model(self):
-        qpos = self.init_qpos# + self.np_random.uniform(low=-.005, high=.005, size=self.model.nq)
-        # qpos[3] += 0.5
+        qpos = np.array(self.init_qpos)# + self.np_random.uniform(low=-.005, high=.005, size=self.model.nq)
+        qvel = np.array(self.init_qvel)# + self.np_random.uniform(low=-.005, high=.005, size=self.model.nv)
         if np.random.random() > 0.5:
-            qpos[3] += 0.1
+            qpos[3] += 0.3
+            qpos[6] -= 0.3
         else:
-            qpos[6] += 0.1
+            qpos[3] -= 0.3
+            qpos[6] += 0.3
+
+        # qvel[0] = 2.5
+
         self.set_state(
             qpos,
-            self.init_qvel# + self.np_random.uniform(low=-.005, high=.005, size=self.model.nv)
+            qvel
         )
 
         self.cur_step = 0

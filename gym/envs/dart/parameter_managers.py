@@ -24,8 +24,8 @@ class hopperContactMassManager:
         self.actuator_nonlin_range = [0.75, 1.5]
         self.reward_predictor = None
 
-        self.activated_param = [5, 9]#[0, 1, 2, 5, 9]#[0,1, 2,3,4,5, 6,7,8, 9, 12,13,14,15]
-        self.controllable_param = [5, 9]#[0, 1, 2, 5, 9]#[0,1, 2,3,4,5, 6,7,8, 9, 12,13,14,15]
+        self.activated_param = [0, 1, 2, 5, 9]#[0, 1, 2, 5, 9]#[0,1, 2,3,4,5, 6,7,8, 9, 12,13,14,15]
+        self.controllable_param = [0, 1, 2, 5, 9]#[0, 1, 2, 5, 9]#[0,1, 2,3,4,5, 6,7,8, 9, 12,13,14,15]
 
         self.binned_param = 0 # don't bin if = 0
 
@@ -158,7 +158,7 @@ class mjHopperManager:
     def __init__(self, simulator):
         self.simulator = simulator
         self.range = [0.2, 1.0]  # friction range
-        self.mass_range = [2.0, 20.0]
+        self.mass_range = [2.0, 7.0]
         self.damping_range = [0.15, 2.0]
         self.power_range = [150, 500]
         self.velrew_weight_range = [-1.0, 1.0]
@@ -168,8 +168,8 @@ class mjHopperManager:
         self.armature_range = [0.05, 0.98]
         self.ankle_jnt_range = [0.5, 1.0]
 
-        self.activated_param = [1]#[0, 1,2,3,4, 5,6,7, 8, 10, 11, 12, 13]
-        self.controllable_param = [1]#[0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13]
+        self.activated_param = [0, 1]#[0, 1,2,3,4, 5,6,7, 8, 10, 11, 12, 13]
+        self.controllable_param = [0, 1]#[0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13]
 
         self.param_dim = len(self.activated_param)
         self.sampling_selector = None
@@ -378,8 +378,8 @@ class walker2dParamManager:
         self.left_leg_power = [20, 150]
         self.right_leg_power = [20, 150]
 
-        self.activated_param = [0, 2]#[0,1,2,3,4,5, 17, 19, 20]#[0,1,2,3,4,5,6,  7,8,9,10,11,12,  13, 14, 15, 16]
-        self.controllable_param = [0, 2]#[0,1,2,3,4,5, 17, 19, 20]#[0,1,2,3,4,5,6,  7,8,9,10,11,12,  13, 14, 15, 16]
+        self.activated_param = [7,8,9,10,11,12,13,14]#[0,1,2,3,4,5, 17, 19, 20]#[0,1,2,3,4,5,6,  7,8,9,10,11,12,  13, 14, 15, 16]
+        self.controllable_param = [7,8,9,10,11,12,13,14]#[0,1,2,3,4,5, 17, 19, 20]#[0,1,2,3,4,5,6,  7,8,9,10,11,12,  13, 14, 15, 16]
 
         self.param_dim = len(self.activated_param)
         self.sampling_selector = None

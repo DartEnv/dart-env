@@ -240,7 +240,7 @@ class DartHopper6LinkEnv(dart_env.DartEnv, utils.EzPickle):
 
         self.do_simulation(tau, self.frame_skip)
 
-    def _step(self, a):
+    def step(self, a):
         if self.latent_feedback:
             self.latent_obs = a[-self.state_dim:]
             a = a[0:len(a) - self.state_dim]

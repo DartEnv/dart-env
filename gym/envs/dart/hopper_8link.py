@@ -16,7 +16,7 @@ class DartHopper8LinkEnv(dart_env.DartEnv, utils.EzPickle):
             obs_dim += len(self.control_bounds[0])
             self.prev_a = np.zeros(len(self.control_bounds[0]))
 
-        self.supp_input = True
+        self.supp_input = False
 
         self.reverse_order = False
 
@@ -231,7 +231,7 @@ class DartHopper8LinkEnv(dart_env.DartEnv, utils.EzPickle):
                             self.body_contact_list[bid - 2] = 1.0
 
         alive_bonus = 1.0
-        reward = 0.3 * (posafter - posbefore) / self.dt
+        reward = 1.0 * (posafter - posbefore) / self.dt
         reward += alive_bonus
         if self.pid_controller is None:
             reward -= 2e-3 * np.square(a).sum()
@@ -247,7 +247,7 @@ class DartHopper8LinkEnv(dart_env.DartEnv, utils.EzPickle):
         self.num_steps += 1.0
         #print(self.num_steps)
         done = not (np.isfinite(s).all() and (np.abs(s[2:]) < 100).all() and
-                    (height > 1.7) and (height < self.init_height + 0.5))
+                    (height > 1.8) and (height < self.init_height + 0.5))
         if not (np.isfinite(s).all() and (np.abs(s[2:]) < 100).all()):
             reward = 0
         if fall_on_ground:
@@ -279,6 +279,8 @@ class DartHopper8LinkEnv(dart_env.DartEnv, utils.EzPickle):
         self.dart_world.reset()
         qpos = self.robot_skeleton.q + self.np_random.uniform(low=-.005, high=.005, size=self.robot_skeleton.ndofs)
         qvel = self.robot_skeleton.dq + self.np_random.uniform(low=-.005, high=.005, size=self.robot_skeleton.ndofs)
+        qvel[0] = 0.5
+
         self.set_state(qpos, qvel)
 
         if self.supp_input:

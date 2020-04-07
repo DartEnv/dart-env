@@ -604,7 +604,7 @@ register(
 register(
     id='DartDarwinSquat-v1',
     entry_point='gym.envs.dart:DartDarwinSquatEnv',
-    max_episode_steps=5000,
+    max_episode_steps=500,
 )
 
 register(
@@ -622,7 +622,7 @@ register(
 register(
     id='DartWalker3d-v1',
     entry_point='gym.envs.dart:DartWalker3dEnv',
-    max_episode_steps=500,
+    max_episode_steps=1000,
 )
 
 register(
