@@ -7,3 +7,5 @@ from gym.envs.classic_control.acrobot import AcrobotEnv
 from gym.envs.classic_control.point_reach import PointReachEnv
 from gym.envs.classic_control.minicar_drive import MiniCarEnv
 from gym.envs.classic_control.lqr import LQREnv
+
+from gym.envs.classic_control.slit_navigation import Slit_Navigation

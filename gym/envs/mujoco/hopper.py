@@ -13,7 +13,7 @@ class HopperEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         self.resample_MP = False  # whether to resample the model paraeters
         self.param_manager = mjHopperManager(self)
         self.velrew_weight = 1
-        self.velrew_input = True
+        self.velrew_input = False
         self.two_pose_input = False
         self.previous_pose = np.zeros(5)
         self.input_time = False
@@ -36,7 +36,7 @@ class HopperEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         # data structure for modeling delays in observation and action
         self.observation_buffer = []
         self.action_buffer = []
-        self.obs_delay = 0
+        self.obs_delay = 1
         self.act_delay = 0
 
         self.cur_step = 0
@@ -47,6 +47,8 @@ class HopperEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         self.total_reward = 0
 
         mujoco_env.MujocoEnv.__init__(self, 'hopper.xml', 4)
+
+        self.param_manager.set_simulator_parameters([0.05])
 
         utils.EzPickle.__init__(self)
 
@@ -190,11 +192,11 @@ class HopperEnv(mujoco_env.MujocoEnv, utils.EzPickle):
                 if i > 0 and self.randomize_history_input:
                     history_obs = np.concatenate([history_obs, self.observation_buffer[-self.obs_delay - 1 - i]])
             else:
-                final_obs = np.concatenate([final_obs, self.observation_buffer[0] * 0.0])
+                final_obs = np.concatenate([final_obs, self.observation_buffer[0]])
                 if i == 0:
-                    current_obs = np.concatenate([history_obs, self.observation_buffer[0] * 0.0])
+                    current_obs = np.concatenate([history_obs, self.observation_buffer[0]])
                 if i > 0 and self.randomize_history_input:
-                    history_obs = np.concatenate([history_obs, self.observation_buffer[0] * 0.0])
+                    history_obs = np.concatenate([history_obs, self.observation_buffer[0]])
         if self.randomize_history_input:
             self.history_buffers.append(history_obs)
             final_obs = np.concatenate(

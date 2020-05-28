@@ -113,7 +113,7 @@ class DartHopperSoftEnv(dart_env.DartEnv, utils.EzPickle):
         ang = self.robot_skeleton.q[2]
         done = not (np.isfinite(s).all() and (np.abs(s[2:]) < 100).all() and (np.abs(self.robot_skeleton.dq) < 100).all()\
             #and not self.fall_on_ground)
-            and (height > self.height_threshold_low) and (abs(ang) < .4))
+            and (height > self.height_threshold_low) and (abs(ang) < .8))
         if self.cur_step >= self.horizon:
             done = True
         return done

@@ -29,7 +29,7 @@ class Walker2dEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         self.action_buffer = []
         self.state_buffer = []
 
-        self.obs_delay = 0
+        self.obs_delay = 2
         self.act_delay = 0
 
         self.cur_step = 0
@@ -40,6 +40,8 @@ class Walker2dEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         self.param_manager = mjWalkerParamManager(self)
 
         mujoco_env.MujocoEnv.__init__(self, "walker2d.xml", 4)
+
+        # self.param_manager.set_simulator_parameters([0.7, 0.4])
 
         utils.EzPickle.__init__(self)
 
@@ -119,7 +121,7 @@ class Walker2dEnv(mujoco_env.MujocoEnv, utils.EzPickle):
             if self.obs_delay + i < len(self.observation_buffer):
                 final_obs = np.concatenate([final_obs, self.observation_buffer[-self.obs_delay - 1 - i]])
             else:
-                final_obs = np.concatenate([final_obs, self.observation_buffer[0] * 0.0])
+                final_obs = np.concatenate([final_obs, self.observation_buffer[0]])
 
         for i in range(self.include_act_history):
             if i < len(self.action_buffer):

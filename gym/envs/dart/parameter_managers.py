@@ -24,8 +24,8 @@ class hopperContactMassManager:
         self.actuator_nonlin_range = [0.75, 1.5]
         self.reward_predictor = None
 
-        self.activated_param = [0, 1, 2, 5, 9]#[0, 1, 2, 5, 9]#[0,1, 2,3,4,5, 6,7,8, 9, 12,13,14,15]
-        self.controllable_param = [0, 1, 2, 5, 9]#[0, 1, 2, 5, 9]#[0,1, 2,3,4,5, 6,7,8, 9, 12,13,14,15]
+        self.activated_param = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]#[0, 1, 2, 5, 9]#[0,1, 2,3,4,5, 6,7,8, 9, 12,13,14,15]
+        self.controllable_param = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]#[0, 1, 2, 5, 9]#[0,1, 2,3,4,5, 6,7,8, 9, 12,13,14,15]
 
         self.binned_param = 0 # don't bin if = 0
 
@@ -168,8 +168,8 @@ class mjHopperManager:
         self.armature_range = [0.05, 0.98]
         self.ankle_jnt_range = [0.5, 1.0]
 
-        self.activated_param = [0, 1]#[0, 1,2,3,4, 5,6,7, 8, 10, 11, 12, 13]
-        self.controllable_param = [0, 1]#[0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13]
+        self.activated_param = [1]#[0, 1,2,3,4, 5,6,7, 8, 10, 11, 12, 13]
+        self.controllable_param = [1]#[0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13]
 
         self.param_dim = len(self.activated_param)
         self.sampling_selector = None
@@ -368,7 +368,7 @@ class walker2dParamManager:
     def __init__(self, simulator):
         self.simulator = simulator
         self.mass_range = [2.0, 10.0]
-        self.damping_range = [0.5, 3.0]
+        self.damping_range = [0.01, 0.2]
         self.friction_range = [0.2, 1.0] # friction range
         self.restitution_range = [0.0, 0.8]
         self.power_range = [50, 150]
@@ -378,8 +378,8 @@ class walker2dParamManager:
         self.left_leg_power = [20, 150]
         self.right_leg_power = [20, 150]
 
-        self.activated_param = [7,8,9,10,11,12,13,14]#[0,1,2,3,4,5, 17, 19, 20]#[0,1,2,3,4,5,6,  7,8,9,10,11,12,  13, 14, 15, 16]
-        self.controllable_param = [7,8,9,10,11,12,13,14]#[0,1,2,3,4,5, 17, 19, 20]#[0,1,2,3,4,5,6,  7,8,9,10,11,12,  13, 14, 15, 16]
+        self.activated_param = [0, 3]#[0,1,2,3,4,5,6,   7,8,9,10,11,12,13,14]#[0,1,2,3,4,5, 17, 19, 20]#[0,1,2,3,4,5,6,  7,8,9,10,11,12,  13, 14, 15, 16]
+        self.controllable_param = [0, 3]#[0,1,2,3,4,5,6,   7,8,9,10,11,12,13,14]#[0,1,2,3,4,5, 17, 19, 20]#[0,1,2,3,4,5,6,  7,8,9,10,11,12,  13, 14, 15, 16]
 
         self.param_dim = len(self.activated_param)
         self.sampling_selector = None
@@ -490,8 +490,8 @@ class mjWalkerParamManager:
         self.armature_range = [0.05, 0.98]
         self.tilt_z_range = [-0.18, 0.18]
 
-        self.activated_param = [0]
-        self.controllable_param = [0]
+        self.activated_param = [6,7]
+        self.controllable_param = [6,7]
 
         self.param_dim = len(self.activated_param)
         self.sampling_selector = None
@@ -534,7 +534,8 @@ class mjWalkerParamManager:
 
         if 7 in self.controllable_param:
             friction = x[cur_id] * (self.range[1] - self.range[0]) + self.range[0]
-            self.simulator.model.geom_friction[-1][0] = friction
+            for bn in range(len(self.simulator.model.geom_friction)):
+                self.simulator.model.geom_friction[bn][0] = friction
             cur_id += 1
         if 8 in self.controllable_param:
             restitution = x[cur_id] * (self.restitution_range[1] - self.restitution_range[0]) + \
@@ -558,7 +559,7 @@ class mjWalkerParamManager:
         if 11 in self.controllable_param:
             armature = x[cur_id] * (self.armature_range[1] - self.armature_range[0]) + \
                             self.armature_range[0]
-            for dof in range(3, 6):
+            for dof in range(3, 9):
                 self.simulator.model.dof_armature[dof] = armature
             cur_id += 1
         if 12 in self.controllable_param:
@@ -670,16 +671,16 @@ class antParamManager:
 class cheetahParamManager:
     def __init__(self, simulator):
         self.simulator = simulator
-        self.mass_range = [1.0, 15.0]
-        self.damping_range = [1.5, 10.0]
-        self.stiff_range = [50, 300]
-        self.friction_range = [0.2, 1.0] # friction range
-        self.restitution_range = [0.0, 0.5]
-        self.gact_scale_range = [0.3, 1.5]
+        self.mass_range = [0.6, 1.5]
+        self.damping_range = [0.7, 1.3]
+        self.stiff_range = [0.7, 1.3]
+        self.friction_range = [0.4, 1.5]  # friction range
+        self.restitution_range = [0.0, 2.0]
+        self.gact_scale_range = [0.6, 1.5]
         self.tilt_z_range = [-0.78, 0.78]
 
-        self.activated_param = [0,1,2,3,4,5,6,7]
-        self.controllable_param = [0,1,2,3,4,5,6,7]
+        self.activated_param = [0, 1, 2, 3, 4, 5, 6,7, 8,9,10,11,12,13, 14,15,16,17,18,19, 20,21,22]
+        self.controllable_param = [0, 1, 2, 3, 4, 5, 6,7, 8,9,10,11,12,13, 14,15,16,17,18,19, 20,21,22]
 
         self.param_dim = len(self.activated_param)
         self.sampling_selector = None
@@ -688,18 +689,18 @@ class cheetahParamManager:
     def get_simulator_parameters(self):
         mass_param = []
         for bid in range(2, 10):
-            cur_mass = self.simulator.robot_skeleton.bodynodes[bid].m
-            mass_param.append((cur_mass - self.mass_range[0]) / (self.mass_range[1] - self.mass_range[0]))
+            cur_mass_ratio = self.simulator.robot_skeleton.bodynodes[bid].m / self.simulator.default_mass[bid]
+            mass_param.append((cur_mass_ratio - self.mass_range[0]) / (self.mass_range[1] - self.mass_range[0]))
 
         damp_param = []
         for jid in [4,5,6,7,8,9]:
-            cur_damp = self.simulator.robot_skeleton.joints[jid].damping_coefficient(0)
-            damp_param.append((cur_damp - self.damping_range[0]) / (self.damping_range[1] - self.damping_range[0]))
+            cur_damp_ratio = self.simulator.robot_skeleton.joints[jid].damping_coefficient(0) / self.simulator.default_dampings[jid]
+            damp_param.append((cur_damp_ratio - self.damping_range[0]) / (self.damping_range[1] - self.damping_range[0]))
 
         stiff_param = []
         for jid in [4, 5, 6, 7, 8, 9]:
-            cur_stiff = self.simulator.robot_skeleton.joints[jid].spring_stiffness(0)
-            stiff_param.append((cur_stiff - self.stiff_range[0]) / (self.stiff_range[1] - self.stiff_range[0]))
+            cur_stiff_ratio = self.simulator.robot_skeleton.joints[jid].spring_stiffness(0) / self.simulator.default_stiffness[jid]
+            stiff_param.append((cur_stiff_ratio - self.stiff_range[0]) / (self.stiff_range[1] - self.stiff_range[0]))
 
         cur_friction = self.simulator.dart_world.skeletons[0].bodynodes[0].friction_coeff()
         friction_param = (cur_friction - self.friction_range[0]) / (self.friction_range[1] - self.friction_range[0])
@@ -721,18 +722,21 @@ class cheetahParamManager:
 
         for bid in range(0, 8):
             if bid in self.controllable_param:
-                mass = x[cur_id] * (self.mass_range[1] - self.mass_range[0]) + self.mass_range[0]
+                mass_ratio = x[cur_id] * (self.mass_range[1] - self.mass_range[0]) + self.mass_range[0]
+                mass = mass_ratio * self.simulator.default_mass[bid+2]
                 self.simulator.robot_skeleton.bodynodes[bid+2].set_mass(mass)
                 cur_id += 1
         for id, jid in enumerate([4,5,6,7,8,9]):
             if id+8 in self.controllable_param:
-                damp = x[cur_id] * (self.damping_range[1] - self.damping_range[0]) + self.damping_range[0]
+                damp_ratio = x[cur_id] * (self.damping_range[1] - self.damping_range[0]) + self.damping_range[0]
+                damp = damp_ratio * self.simulator.default_dampings[jid]
                 self.simulator.robot_skeleton.joints[jid].set_damping_coefficient(0, damp)
                 cur_id += 1
 
         for id, jid in enumerate([4,5,6,7,8,9]):
             if id+14 in self.controllable_param:
-                stiff = x[cur_id] * (self.stiff_range[1] - self.stiff_range[0]) + self.stiff_range[0]
+                stiff_ratio = x[cur_id] * (self.stiff_range[1] - self.stiff_range[0]) + self.stiff_range[0]
+                stiff = stiff_ratio * self.simulator.default_stiffness[jid]
                 self.simulator.robot_skeleton.joints[jid].set_spring_stiffness(0, stiff)
                 cur_id += 1
 
@@ -764,7 +768,7 @@ class cheetahParamManager:
 class mjcheetahParamManager:
     def __init__(self, simulator):
         self.simulator = simulator
-        self.range = [0.2, 1.0]  # friction range
+        self.range = [0.2, 2.0]  # friction range
         self.velrew_weight_range = [-1.0, 1.0]
         self.restitution_range = [0.5, 1.0]
         self.solimp_range = [0.8, 0.99]
@@ -772,8 +776,8 @@ class mjcheetahParamManager:
         self.armature_range = [0.05, 0.98]
         self.tilt_z_range = [-0.18, 0.18]
 
-        self.activated_param = [5]
-        self.controllable_param = [5]
+        self.activated_param = [2]
+        self.controllable_param = [2]
 
         self.param_dim = len(self.activated_param)
         self.sampling_selector = None

@@ -7,7 +7,7 @@ from gym.envs.dart import dart_env
 class DartHopper8LinkEnv(dart_env.DartEnv, utils.EzPickle):
     def __init__(self):
         self.control_bounds = np.array([[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],[-1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0]])
-        self.action_scale = 50
+        self.action_scale = 150
         self.include_action_in_obs = False
         self.randomize_dynamics = False
         obs_dim = 19
@@ -247,7 +247,7 @@ class DartHopper8LinkEnv(dart_env.DartEnv, utils.EzPickle):
         self.num_steps += 1.0
         #print(self.num_steps)
         done = not (np.isfinite(s).all() and (np.abs(s[2:]) < 100).all() and
-                    (height > 1.8) and (height < self.init_height + 0.5))
+                    (height > 2.0) and (height < self.init_height + 0.5))
         if not (np.isfinite(s).all() and (np.abs(s[2:]) < 100).all()):
             reward = 0
         if fall_on_ground:

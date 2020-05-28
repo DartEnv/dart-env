@@ -10,33 +10,170 @@
         <skeleton name="ground skeleton">
             <mobile>false</mobile>
             <body name="ground">
-                <transformation>0 -0.025 0 0 0 0</transformation>
+                <transformation>0 -0.25 0 0 0 0</transformation>
                 <visualization_shape>
-                    <transformation>0 0 0 0 0 0</transformation>
+                    <transformation>1 -1.75 0 0 0 0</transformation>
                     <geometry>
                         <box>
-                            <size>500.0 0.05 500.0</size>
+                            <size>4.0 4.0 8.0</size>
                         </box>
                     </geometry>
                     <color>0.7 0.7 0.7 1.0 </color>
                 </visualization_shape>
                 <collision_shape>
-                    <transformation>0 0 0 0 0 0</transformation>
+                    <transformation>1 -1.75 0 0 0 0</transformation>
                     <geometry>
                         <box>
-                            <size>500.0 0.05 500.0</size>
+                            <size>4.0 4.0 8.0</size>
                         </box>
                     </geometry>
                 </collision_shape>
-            </body>
 
+                <!-- bridge -->
+                <visualization_shape>
+                    <transformation>5 -1.75 -1.5 0 0.785398 0</transformation>
+                    <geometry>
+                        <box>
+                            <size>8.0 4.0 2.5</size>
+                        </box>
+                    </geometry>
+                    <color>0.7 0.7 0.7 1.0 </color>
+                </visualization_shape>
+                <collision_shape>
+                    <transformation>5 -1.75 -1.5 0 0.785398 0</transformation>
+                    <geometry>
+                        <box>
+                            <size>8.0 4.0 2.5</size>
+                        </box>
+                    </geometry>
+                </collision_shape>
+
+                <visualization_shape>
+                    <transformation>10 -1.75 -1.5 0 -0.785398 0</transformation>
+                    <geometry>
+                        <box>
+                            <size>8.0 4.0 2.5</size>
+                        </box>
+                    </geometry>
+                    <color>0.7 0.7 0.7 1.0 </color>
+                </visualization_shape>
+                <collision_shape>
+                    <transformation>10 -1.75 -1.5 0 -0.785398 0</transformation>
+                    <geometry>
+                        <box>
+                            <size>8.0 4.0 2.5</size>
+                        </box>
+                    </geometry>
+                </collision_shape>
+
+                <visualization_shape>
+                    <transformation>15 -1.75 -1.5 0 0.785398 0</transformation>
+                    <geometry>
+                        <box>
+                            <size>8.0 4.0 2.5</size>
+                        </box>
+                    </geometry>
+                    <color>0.7 0.7 0.7 1.0 </color>
+                </visualization_shape>
+                <collision_shape>
+                    <transformation>15 -1.75 -1.5 0 0.785398 0</transformation>
+                    <geometry>
+                        <box>
+                            <size>8.0 4.0 2.5</size>
+                        </box>
+                    </geometry>
+                </collision_shape>
+
+                <visualization_shape>
+                    <transformation>20 -1.75 -1.5 0 -0.785398 0</transformation>
+                    <geometry>
+                        <box>
+                            <size>8.0 4.0 2.5</size>
+                        </box>
+                    </geometry>
+                    <color>0.7 0.7 0.7 1.0 </color>
+                </visualization_shape>
+                <collision_shape>
+                    <transformation>20 -1.75 -1.5 0 -0.785398 0</transformation>
+                    <geometry>
+                        <box>
+                            <size>8.0 4.0 2.5</size>
+                        </box>
+                    </geometry>
+                </collision_shape>
+
+
+                <visualization_shape>
+                    <transformation>24 -1.75 0 0 0 0</transformation>
+                    <geometry>
+                        <box>
+                            <size>4.0 4.0 8.0</size>
+                        </box>
+                    </geometry>
+                    <color>0.7 0.7 0.7 1.0 </color>
+                </visualization_shape>
+                <collision_shape>
+                    <transformation>24 -1.75 0 0 0 0</transformation>
+                    <geometry>
+                        <box>
+                            <size>4.0 4.0 8.0</size>
+                        </box>
+                    </geometry>
+                </collision_shape>
+
+                <visualization_shape>
+                    <transformation>26.5 -1.05 0 0 0 0</transformation>
+                    <geometry>
+                        <box>
+                            <size>1.0 4.0 8.0</size>
+                        </box>
+                    </geometry>
+                    <color>0.7 0.7 0.7 1.0 </color>
+                </visualization_shape>
+                <collision_shape>
+                    <transformation>26.5 -1.05 0 0 0 0</transformation>
+                    <geometry>
+                        <box>
+                            <size>1.0 4.0 8.0</size>
+                        </box>
+                    </geometry>
+                </collision_shape>
+
+            </body>
             <joint type="free" name="joint 1">
                 <parent>world</parent>
                 <child>ground</child>
             </joint>
         </skeleton>
 
+        <skeleton name="bot_viz">
+            <mobile>false</mobile>
+            <transformation>0 0.0 0 0 0 0</transformation>
+            <body name="root">
+                <transformation> 0.0 0.3 0 0 0 0</transformation>
+                <inertia>
+                    <mass>4.0</mass>
+                    <offset>0.0 0 0.0</offset>
+                </inertia>
+                <visualization_shape>
+                    <transformation>0.0 0 0.0 0.0 0.0 0</transformation>
+                    <geometry>
+                        <ellipsoid>
+                            <size>1.2 1.2 1.2</size>
+                        </ellipsoid>
+                    </geometry>
+                    <color>0.1 0.1 0.8 1.0 </color>
+                </visualization_shape>
+            </body>
 
+
+
+            <!-- JOINT: Pelvis -->
+            <joint type="translational" name="rootj">
+                <parent>world</parent>
+                <child>root</child>
+            </joint>
+        </skeleton>
 
 
         <skeleton name="ant">
@@ -394,6 +531,10 @@
                 </collision_shape>
             </body>
 
+
+
+
+
             <!-- JOINT: Pelvis -->
             <joint type="translational" name="j_torso">
                 <parent>world</parent>
@@ -426,7 +567,7 @@
                     </limit>
                     <dynamics>
                         <damping>10.0</damping>
-                        <friction>5.0</friction>
+                        <friction>0.0</friction>
                     </dynamics>
                 </axis>
                 <init_pos>0.0</init_pos>
@@ -445,7 +586,7 @@
                     </limit>
                     <dynamics>
                         <damping>10.0</damping>
-                        <friction>5.0</friction>
+                        <friction>0.0</friction>
                     </dynamics>
                 </axis>
                 <init_pos>0.0</init_pos>
@@ -472,7 +613,7 @@
                     </limit>
                     <dynamics>
                         <damping>10.0</damping>
-                        <friction>5.0</friction>
+                        <friction>0.0</friction>
                     </dynamics>
                 </axis>
                 <init_pos>0.0</init_pos>
@@ -491,7 +632,7 @@
                     </limit>
                     <dynamics>
                         <damping>10.0</damping>
-                        <friction>5.0</friction>
+                        <friction>0.0</friction>
                     </dynamics>
                 </axis>
                 <init_pos>0.0</init_pos>
@@ -517,7 +658,7 @@
                     </limit>
                     <dynamics>
                         <damping>10.0</damping>
-                        <friction>5.0</friction>
+                        <friction>0.0</friction>
                     </dynamics>
                 </axis>
                 <init_pos>0.0</init_pos>
@@ -536,7 +677,7 @@
                     </limit>
                     <dynamics>
                         <damping>10.0</damping>
-                        <friction>5.0</friction>
+                        <friction>0.0</friction>
                     </dynamics>
                 </axis>
                 <init_pos>0.0</init_pos>
@@ -563,7 +704,7 @@
                     </limit>
                     <dynamics>
                         <damping>10.0</damping>
-                        <friction>5.0</friction>
+                        <friction>0.0</friction>
                     </dynamics>
                 </axis>
                 <init_pos>0.0</init_pos>
@@ -582,7 +723,7 @@
                     </limit>
                     <dynamics>
                         <damping>10.0</damping>
-                        <friction>5.0</friction>
+                        <friction>0.0</friction>
                     </dynamics>
                 </axis>
                 <init_pos>0.0</init_pos>
@@ -593,6 +734,5 @@
 
     </world>
 </skel>
-
 
 

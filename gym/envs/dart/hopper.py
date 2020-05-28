@@ -18,11 +18,13 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         self.control_bounds = np.array([[1.0, 1.0, 1.0], [-1.0, -1.0, -1.0]])
         self.action_scale = np.array([200.0, 200.0, 200.0]) * 1.0
         self.train_UP = False
-        self.velrew_input = True
+        self.velrew_input = False
         self.noisy_input = True
         self.randomize_initial_state = True
         self.input_time = False
         self.two_pose_input = False  # whether to use two q's instead of q and dq
+
+        self.vector_step_sim = False
 
         self.butterworth_filter = False
 
@@ -120,7 +122,7 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         self.height_reward = 0.0
 
         self.UP_noise_level = 0.0
-        self.resample_MP = True  # whether to resample the model paraeters
+        self.resample_MP = False  # whether to resample the model paraeters
 
         self.actuator_nonlinearity = False
         self.actuator_nonlin_coef = 1.0
@@ -289,6 +291,11 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         if self.butterworth_filter:
             self.action_filter = ActionFilter(self.act_dim, 3, int(1.0/self.dt), low_cutoff=0.0, high_cutoff=8.0)
 
+        self.add_perturbation = False
+        self.perturbation_parameters = [0.01, 25, 2, 50]  # probability, magnitude, bodyid, duration
+        self.perturbation_duration = 40
+        self.perturb_force = np.array([0, 0, 0])
+
         utils.EzPickle.__init__(self)
 
     def resample_task(self, iter_num=None):
@@ -371,43 +378,63 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
         if self.pid_controller is not None:
             target_angles = np.copy(tau[3:])#(np.copy(tau[3:]) + 1.0) / 2.0 * (self.joint_upper_lim - self.joint_lower_lim) + self.joint_lower_lim
         average_torque = []
-        for _ in range(n_frames):
-            if self.pid_controller is not None:
-                jpos = np.array(self.robot_skeleton.q)[3:]
-                jvel = np.array(self.robot_skeleton.dq)[3:]
 
-                torque = self.pid_controller[0] * (target_angles - jpos) - self.pid_controller[1] * jvel
-                clipped_torque = np.clip(torque, self.torque_limit[0], self.torque_limit[1])
+        if self.add_perturbation:
+            if self.perturbation_duration == 0:
+                self.perturb_force *= 0
+                if np.random.random() < self.perturbation_parameters[0]:
+                    axis_rand = np.random.randint(0, 2, 1)[0]
+                    direction_rand = np.random.randint(0, 2, 1)[0] * 2 - 1
+                    self.perturb_force[axis_rand] = direction_rand * self.perturbation_parameters[1]
+                    self.perturbation_duration = self.perturbation_parameters[3]
 
-                tau = np.concatenate([[0.0] * 3, clipped_torque])
-                average_torque.append(clipped_torque)
-
-            if len(self.short_perturb_params) > 0:
-                if self.cur_step * self.dt > self.short_perturb_params[0] and \
-                        self.cur_step * self.dt < self.short_perturb_params[1]:
-                    self.robot_skeleton.bodynodes[2].add_ext_force(self.short_perturb_params[2])
-
-            if self.learnable_perturbation:  # if learn to perturb
-                for bid, pert_param in enumerate(self.learnable_perturbation_list):
-                    force_dir = self.learnable_perturbation_act[bid * 6: bid * 6 + 3]
-                    torque_dir = self.learnable_perturbation_act[bid * 6 + 3: bid * 6 + 6]
-                    if np.all(force_dir == 0):
-                        pert_force = np.zeros(3)
-                    else:
-                        pert_force = pert_param[1] * force_dir / np.linalg.norm(force_dir)
-                    if np.all(torque_dir == 0):
-                        pert_torque = np.zeros(3)
-                    else:
-                        pert_torque = pert_param[2] * torque_dir / np.linalg.norm(torque_dir)
-                    self.robot_skeleton.bodynode(pert_param[0]).add_ext_force(pert_force)
-                    self.robot_skeleton.bodynode(pert_param[0]).add_ext_torque(pert_torque)
-
-            if self.use_spline_action:
-                self.robot_skeleton.set_forces(tau[_])
             else:
-                self.robot_skeleton.set_forces(tau)
-            self.joint_works += np.abs(tau * np.array(self.robot_skeleton.dq) * self.sim_dt)
-            self.dart_world.step()
+                self.perturbation_duration -= 1
+
+        if not self.vector_step_sim:
+            for _ in range(n_frames):
+                if self.add_perturbation:
+                    self.robot_skeleton.bodynodes[self.perturbation_parameters[2]].add_ext_force(self.perturb_force)
+
+
+                if self.pid_controller is not None:
+                    jpos = np.array(self.robot_skeleton.q)[3:]
+                    jvel = np.array(self.robot_skeleton.dq)[3:]
+
+                    torque = self.pid_controller[0] * (target_angles - jpos) - self.pid_controller[1] * jvel
+                    clipped_torque = np.clip(torque, self.torque_limit[0], self.torque_limit[1])
+
+                    tau = np.concatenate([[0.0] * 3, clipped_torque])
+                    average_torque.append(clipped_torque)
+
+                if len(self.short_perturb_params) > 0:
+                    if self.cur_step * self.dt > self.short_perturb_params[0] and \
+                            self.cur_step * self.dt < self.short_perturb_params[1]:
+                        self.robot_skeleton.bodynodes[2].add_ext_force(self.short_perturb_params[2])
+
+                if self.learnable_perturbation:  # if learn to perturb
+                    for bid, pert_param in enumerate(self.learnable_perturbation_list):
+                        force_dir = self.learnable_perturbation_act[bid * 6: bid * 6 + 3]
+                        torque_dir = self.learnable_perturbation_act[bid * 6 + 3: bid * 6 + 6]
+                        if np.all(force_dir == 0):
+                            pert_force = np.zeros(3)
+                        else:
+                            pert_force = pert_param[1] * force_dir / np.linalg.norm(force_dir)
+                        if np.all(torque_dir == 0):
+                            pert_torque = np.zeros(3)
+                        else:
+                            pert_torque = pert_param[2] * torque_dir / np.linalg.norm(torque_dir)
+                        self.robot_skeleton.bodynode(pert_param[0]).add_ext_force(pert_force)
+                        self.robot_skeleton.bodynode(pert_param[0]).add_ext_torque(pert_torque)
+
+                if self.use_spline_action:
+                    self.robot_skeleton.set_forces(tau[_])
+                else:
+                    self.robot_skeleton.set_forces(tau)
+                self.joint_works += np.abs(tau * np.array(self.robot_skeleton.dq) * self.sim_dt)
+                self.dart_world.step()
+        else:
+            self.dart_world.step_control(2, tau, n_frames)
         if self.pid_controller is not None:
             self.average_torque = np.mean(average_torque, axis=0)
 
@@ -526,7 +553,7 @@ class DartHopperEnv(dart_env.DartEnv, utils.EzPickle):
             if (self.robot_skeleton.q_upper[j] - self.robot_skeleton.q[j]) < 0.05:
                 joint_limit_penalty += abs(1.5)
         reward = (posafter - self.posbefore) / self.dt * self.velrew_weight
-        # reward = np.clip(reward, -100.0, 2.0)
+        # reward = np.clip(reward, -100.0, 1.0)
 
         if self.learn_goto is not None:
             reward = 0

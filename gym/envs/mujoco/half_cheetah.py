@@ -12,13 +12,18 @@ class HalfCheetahEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         self.param_manager = mjcheetahParamManager(self)
         self.velrew_weight = 1.0
 
+        self.learn_rear_walk = False  # learn to walk with rear legs only
+        self.learn_lim_vel = None#2.0
+
+        self.learn_alternative_walk = False
+
         self.include_obs_history = 1
         self.include_act_history = 0
 
         # data structure for modeling delays in observation and action
         self.observation_buffer = []
         self.action_buffer = []
-        self.obs_delay = 0
+        self.obs_delay = 1
         self.act_delay = 0
         self.tilt_z = 0
 
@@ -55,9 +60,38 @@ class HalfCheetahEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         pass
 
     def terminated(self):
+        valid_contact_names = ['floor', 'bfoot', 'ffoot', 'bshin', 'fshin']
+        fall_on_ground = False
+
+        if self.learn_rear_walk:
+            valid_contact_names = ['floor', 'bfoot']
+
+        for contact in self.data.contact:
+            if self.model.geom_id2name(contact.geom1) not in valid_contact_names or\
+                self.model.geom_id2name(contact.geom2) not in valid_contact_names:
+                fall_on_ground = True
+
         if self.current_step > self.max_step:
             return True
-        return False
+
+        if self.learn_lim_vel is not None:
+            if self.data.get_body_xvelp('torso')[0] > self.learn_lim_vel:
+                return True
+
+        if self.learn_alternative_walk:
+            front_contact = False
+            rear_contact = False
+            for contact in self.data.contact:
+                if self.model.geom_id2name(contact.geom1) == 'ffoot' or\
+                    self.model.geom_id2name(contact.geom2) == 'ffot':
+                    front_contact = True
+                if self.model.geom_id2name(contact.geom1) == 'bfoot' or\
+                    self.model.geom_id2name(contact.geom2) == 'bfot':
+                    rear_contact = True
+            if front_contact and rear_contact:
+                return True
+
+        return fall_on_ground
 
     def pre_advance(self):
         self.posbefore = self.sim.data.qpos[0]
@@ -67,11 +101,12 @@ class HalfCheetahEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         alive_bonus = 1.0
         reward = (posafter - self.posbefore) / self.dt * self.velrew_weight
         reward += alive_bonus
-        reward -= 0.1 * np.square(a).sum()
+        reward -= 0.01 * np.square(a).sum()
         return reward
 
 
     def step(self, a):
+        a = np.clip(a, -1, 1)
         self.pre_advance()
         self.advance(a)
         self.post_advance()
@@ -114,8 +149,17 @@ class HalfCheetahEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         return final_obs
 
     def reset_model(self):
-        qpos = self.init_qpos + self.np_random.uniform(low=-.1, high=.1, size=self.model.nq)
-        qvel = self.init_qvel + self.np_random.randn(self.model.nv) * .1
+        qpos = np.array(self.init_qpos)# + self.np_random.uniform(low=-.1, high=.1, size=self.model.nq)
+        qvel = np.array(self.init_qvel)# + self.np_random.randn(self.model.nv) * .1
+
+        if self.learn_rear_walk:
+            qpos[1] += 0.15
+            qpos[2] -= 1.0
+
+        if self.learn_alternative_walk:
+            qpos[1] += 0.08
+            qpos[2] -= 0.3
+
         self.set_state(qpos, qvel)
 
         self.observation_buffer = []

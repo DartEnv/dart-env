@@ -94,7 +94,7 @@ class DartEnv(gym.Env):
 
         # random perturbation
         self.add_perturbation = False
-        self.perturbation_parameters = [0.02, 500, 2, 40] # probability, magnitude, bodyid, duration
+        self.perturbation_parameters = [0.01, 100, 2, 50] # probability, magnitude, bodyid, duration
         self.perturbation_duration = 40
         self.perturb_force = np.array([0, 0, 0])
 

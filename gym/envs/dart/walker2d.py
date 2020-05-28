@@ -53,8 +53,8 @@ class DartWalker2dEnv(dart_env.DartEnv, utils.EzPickle):
 
         self.t = 0
 
-        self.include_obs_history = 10
-        self.include_act_history = 9
+        self.include_obs_history = 1
+        self.include_act_history = 0
         obs_dim *= self.include_obs_history
         obs_dim += len(self.control_bounds[0]) * self.include_act_history
 
@@ -131,6 +131,8 @@ class DartWalker2dEnv(dart_env.DartEnv, utils.EzPickle):
 
         self.obs_delay = 0
         self.act_delay = 0
+
+        self.perturbation_parameters = [0.01, 100, 2, 50]  # probability, magnitude, bodyid, duration
 
         #print('sim parameters: ', self.param_manager.get_simulator_parameters())
         self.current_param = self.param_manager.get_simulator_parameters()
@@ -245,6 +247,7 @@ class DartWalker2dEnv(dart_env.DartEnv, utils.EzPickle):
         self.do_simulation(tau, self.frame_skip)
 
     def step(self, a):
+
         action_filter_rew = 0
         if self.action_filtering > 0 and self.action_filter_reward > 0 and len(self.action_filter_cache) > 0:
             action_filter_rew = -np.abs(np.mean(self.action_filter_cache, axis=0) - a).sum() * self.action_filter_reward

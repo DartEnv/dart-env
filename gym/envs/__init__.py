@@ -206,6 +206,13 @@ register(
     max_episode_steps = 150,
 )
 
+# slit navigation
+register(
+    id='SlitNav-v1',
+    entry_point = 'gym.envs.classic_control:Slit_Navigation',
+    max_episode_steps = 400,
+)
+
 register(
     id='MiniCar-v1',
     entry_point = 'gym.envs.classic_control:MiniCarEnv',
@@ -592,7 +599,7 @@ register(
 register(
     id='DartAnt-v1',
     entry_point='gym.envs.dart:DartAntEnv',
-    max_episode_steps=1000,
+    max_episode_steps=500,
 )
 
 register(
@@ -707,7 +714,7 @@ register(
 register(
     id='DartBridgePuzzle-v1',
     entry_point='gym.envs.dart:DartBridgePuzzle',
-    max_episode_steps = 500,
+    max_episode_steps = 650,
 )
 
 # Mujoco
