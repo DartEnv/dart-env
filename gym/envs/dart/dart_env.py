@@ -136,6 +136,8 @@ class DartEnv(gym.Env):
             'video.frames_per_second' : int(np.round(1.0 / self.dt))
         }
 
+        self.render_frame = None
+
 
     def seed(self, seed=None):
         np.random.seed(seed)
@@ -227,6 +229,9 @@ class DartEnv(gym.Env):
 
         if mode == 'rgb_array':
             data = self._get_viewer().getFrame()
+            if self.render_frame is not None:
+                assert len(self.render_frame) == 4
+                data = data[self.render_frame[0]:self.render_frame[1], self.render_frame[2]:self.render_frame[3], :]
             return data
         elif mode == 'human':
             self._get_viewer().runSingleStep()

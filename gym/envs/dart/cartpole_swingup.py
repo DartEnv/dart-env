@@ -21,6 +21,8 @@ class DartCartPoleSwingUpEnv(dart_env.DartEnv):
         self.avg_div = 0
         self.param_manager = CartPoleManager(self)
 
+        self.avoid_obstacle = False
+
         self.use_discrete_action = False
 
         self.input_exp = 0 # dim of input exploration
@@ -34,6 +36,8 @@ class DartCartPoleSwingUpEnv(dart_env.DartEnv):
 
         self.randomize_initial_state = True
 
+        self.alive_bonus = 5.0
+
         self.split_task_test = False
         self.tasks = TaskList(1)
         self.tasks.add_world_choice_tasks([0])
@@ -42,16 +46,27 @@ class DartCartPoleSwingUpEnv(dart_env.DartEnv):
 
         self.cur_step = 0
 
-        obs_dim = 4 + self.input_exp
+        self.continuous_input = True
+
+        obs_dim = 4 + self.input_exp + (1 if self.continuous_input else 0)
         if self.train_UP:
             obs_dim += self.param_manager.param_dim
         if self.train_mp_sel:
             obs_dim += 5
 
+        self.input_time = True
+        if self.input_time:
+            obs_dim += 1
+
         self.juggling = False
         if self.juggling:
             obs_dim += 4
             self.action_scale *= 2
+
+        if not self.juggling:
+            self.alive_bonus = 6.0
+        else:
+            self.alive_bonus = 4.0
 
         if self.learn_additive_pol:
             obs_dim += 1
@@ -73,6 +88,10 @@ class DartCartPoleSwingUpEnv(dart_env.DartEnv):
         dart_env.DartEnv.__init__(self, ['cartpole_swingup.skel', 'cartpole_swingup_variation1.skel',
                                          'cartpole_swingup_variation2.skel'], 2, obs_dim, self.control_bounds, dt=0.01,
                                   disableViewer=True, action_type="continuous" if not self.use_discrete_action else "discrete")
+        if not self.avoid_obstacle:
+            for s in self.dart_world.skeletons[3].bodynodes[0].shapenodes:
+                s.set_offset([100, 100, 100])
+
         self.current_param = self.param_manager.get_simulator_parameters()
         # self.dart_world.skeletons[1].bodynodes[0].set_friction_coeff(0.2)
         # self.dart_world.skeletons[1].bodynodes[0].set_restitution_coeff(0.7)
@@ -94,8 +113,13 @@ class DartCartPoleSwingUpEnv(dart_env.DartEnv):
         # data structure for modeling delays in observation and action
         self.observation_buffer = []
         self.action_buffer = []
-        self.obs_delay = 1
-        self.act_delay = 1
+        self.obs_delay = 0
+        self.act_delay = 0
+
+        self.add_perturbation = False
+        self.perturbation_parameters = [0.01, 10, 2, 50]  # probability, magnitude, bodyid, duration
+        self.perturbation_duration = 10
+        self.perturb_force = np.array([0, 0, 0])
 
         utils.EzPickle.__init__(self)
 
@@ -119,6 +143,11 @@ class DartCartPoleSwingUpEnv(dart_env.DartEnv):
         return [a[0]]
 
     def terminated(self):
+        if self.avoid_obstacle:
+            contacts = self.dart_world.collision_result.contacts
+            if len(contacts) > 0:
+                return True
+
         done = abs(self.robot_skeleton.dq[1]) > 35 or abs(self.robot_skeleton.q[0]) > 2.0
         return done
 
@@ -128,20 +157,17 @@ class DartCartPoleSwingUpEnv(dart_env.DartEnv):
         ang_proc = (np.abs(ang) % (2 * np.pi))
         ang_proc = np.min([ang_proc, (2 * np.pi) - ang_proc])
 
-        if not self.juggling:
-            alive_bonus = 6.0
-        else:
-            alive_bonus = 4.0
         ang_cost = 1.0 * (ang_proc ** 2)
         quad_ctrl_cost = 0.01 * np.square(a).sum()
         com_cost = 2.0 * np.abs(self.robot_skeleton.q[0]) ** 2
 
-        reward = alive_bonus - ang_cost - quad_ctrl_cost - com_cost
+        reward = self.alive_bonus - ang_cost - quad_ctrl_cost - com_cost
         if ang_proc < 0.5:
             reward += np.max([5 - (ang_proc) * 4, 0]) + np.max([3 - np.abs(self.robot_skeleton.dq[1]), 0])
         return reward
 
     def step(self, a):
+        a = np.copy(a)
         if self.use_discrete_action:
             a = np.array([a * 1.0/ np.floor(self.action_space.n/2.0) - 1.0])
 
@@ -152,6 +178,9 @@ class DartCartPoleSwingUpEnv(dart_env.DartEnv):
         reward = self.reward_func(a)
 
         done = self.terminated()
+
+        if done :
+            reward = 0.0
 
         if self.perturb_MP:
             self.param_manager.set_simulator_parameters(
@@ -190,8 +219,10 @@ class DartCartPoleSwingUpEnv(dart_env.DartEnv):
         ang_proc = (ang % (2 * np.pi))
         if ang_proc > np.pi:
             ang_proc -= 2 * np.pi
-
         state[1] = ang_proc
+
+        if self.continuous_input:
+            state = np.array([state[0], np.sin(ang), np.cos(ang), state[2], state[3]])
 
         if self.juggling:
             state = np.concatenate([state, self.dart_world.skeletons[1].com()[[0, 1]],
@@ -224,12 +255,14 @@ class DartCartPoleSwingUpEnv(dart_env.DartEnv):
         if self.input_exp > 0:
             state = np.concatenate([state, self.sampled_input_exp])
 
+        if self.input_time:
+            state = np.concatenate([state, [self.dt * self.cur_step]])
+
         self.observation_buffer.append(np.copy(state))
         if len(self.observation_buffer) < self.obs_delay + 1:
             state = self.observation_buffer[0]
         else:
             state = self.observation_buffer[-self.obs_delay - 1]
-
         return state
 
     def reset_model(self):
@@ -358,3 +391,11 @@ class DartCartPoleSwingUpEnv(dart_env.DartEnv):
 
     def post_advance(self):
         pass
+
+    # set state from observation
+    def set_from_obs(self, obs):
+        if self.continuous_input:
+            state = [obs[0], np.arctan2(obs[1], obs[2]), obs[3], obs[4]]
+            self.set_state_vector(state)
+        else:
+            raise NotImplementedError

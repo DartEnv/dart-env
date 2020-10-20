@@ -203,7 +203,14 @@ register(
 register(
     id='PointReach-v1',
     entry_point = 'gym.envs.classic_control:PointReachEnv',
-    max_episode_steps = 150,
+    max_episode_steps = 500,
+)
+
+# Point Mass
+register(
+    id='PointMass-v1',
+    entry_point = 'gym.envs.classic_control:PointMassEnv',
+    max_episode_steps = 500,
 )
 
 # slit navigation
@@ -266,6 +273,13 @@ register(
 register(
     id='DartHopper-v1',
     entry_point='gym.envs.dart:DartHopperEnv',
+    reward_threshold=3800.0,
+    max_episode_steps=1000,
+)
+
+register(
+    id='DartHopperHybrid-v1',
+    entry_point='gym.envs.dart:DartHopperHybridEnv',
     reward_threshold=3800.0,
     max_episode_steps=1000,
 )
@@ -621,8 +635,20 @@ register(
 )
 
 register(
+    id='DartFrankaTransport-v1',
+    entry_point='gym.envs.dart:DartFrankaTransportEnv',
+    max_episode_steps=1000,
+)
+
+register(
     id='DartOP3-v1',
     entry_point='gym.envs.dart:DartOP3Env',
+    max_episode_steps=1000,
+)
+
+register(
+    id='DartA1-v1',
+    entry_point='gym.envs.dart:DartA1Env',
     max_episode_steps=1000,
 )
 
@@ -715,6 +741,12 @@ register(
     id='DartBridgePuzzle-v1',
     entry_point='gym.envs.dart:DartBridgePuzzle',
     max_episode_steps = 650,
+)
+
+register(
+    id='DartBallCircle-v1',
+    entry_point='gym.envs.dart:DartBallCircle',
+    max_episode_steps = 2000,
 )
 
 # Mujoco

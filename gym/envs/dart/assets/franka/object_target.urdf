@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<robot name="object_robot">
+     <material name="Green">
+                <color rgba ="0.6 1.0 0.2 1.0"/>
+            </material>
+    <link name="world" />
+    <link name="object">
+        <inertial>
+            <mass value="0.26" />
+            <origin xyz="0.0 0 0.0" rpy="0 0 0"/>
+            <inertia ixx="0.00026" ixy="0" ixz="0" iyy="0.00026" iyz="0" izz="0.00026" />
+        </inertial>
+        <visual>
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <geometry>
+                <sphere radius="0.05" />
+            </geometry>
+            <material name="Green" />
+        </visual>
+    </link>
+    <joint name="ground_joint" type="fixed">
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <parent link="world" />
+        <child link="object" />
+    </joint>
+
+
+</robot>

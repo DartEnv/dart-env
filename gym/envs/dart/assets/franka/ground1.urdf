@@ -1,0 +1,218 @@
+<?xml version="1.0"?>
+<robot name="ground_skeleton">
+     <material name="Stripe2">
+                <color rgba ="1.0 0.6 0.2 1.0"/>
+            </material>
+    <link name="world" />
+    <link name="ground_link">
+        <inertial>
+            <mass value="1.0" />
+            <origin xyz="2.5 0 -1.025" rpy="0 0 0"/>
+            <inertia ixx="1.0" ixy="0" ixz="0" iyy="1.0" iyz="0" izz="1.0" />
+        </inertial>
+        <visual>
+            <origin xyz="0 0 -1.025" rpy="0 0 0" />
+            <geometry>
+                <box size="125 10 2.05" />
+            </geometry>
+            <material name="Carpet">
+                <color rgba ="0.985 0.985 0.985 1.0"/>
+            </material>
+        </visual>
+
+        <visual>
+            <origin xyz="-2 0 -1.025" rpy="0 0 0" />
+            <geometry>
+                <box size="0.025 10 2.0525" />
+            </geometry>
+            <material name="Stripe2" />
+        </visual>
+
+        <visual>
+            <origin xyz="-1 0 -1.025" rpy="0 0 0" />
+            <geometry>
+                <box size="0.025 10 2.0525" />
+            </geometry>
+            <material name="Stripe2" />
+        </visual>
+
+        <visual>
+            <origin xyz="0 0 -1.025" rpy="0 0 0" />
+            <geometry>
+                <box size="0.025 10 2.0525" />
+            </geometry>
+            <material name="Stripe2" />
+        </visual>
+
+        <visual>
+            <origin xyz="1 0 -1.025" rpy="0 0 0" />
+            <geometry>
+                <box size="0.025 10 2.0525" />
+            </geometry>
+            <material name="Stripe2" />
+        </visual>
+
+        <visual>
+            <origin xyz="2 0 -1.025" rpy="0 0 0" />
+            <geometry>
+                <box size="0.025 10 2.0525" />
+            </geometry>
+            <material name="Stripe2" />
+        </visual>
+
+        <visual>
+            <origin xyz="3 0 -1.025" rpy="0 0 0" />
+            <geometry>
+                <box size="0.025 10 2.0525" />
+            </geometry>
+            <material name="Stripe2" />
+        </visual>
+
+        <visual>
+            <origin xyz="3 0 -1.025" rpy="0 0 0" />
+            <geometry>
+                <box size="0.025 10 2.0525" />
+            </geometry>
+            <material name="Stripe2" />
+        </visual>
+
+        <visual>
+            <origin xyz="4 0 -1.025" rpy="0 0 0" />
+            <geometry>
+                <box size="0.025 10 2.0525" />
+            </geometry>
+            <material name="Stripe2" />
+        </visual>
+
+        <visual>
+            <origin xyz="5 0 -1.025" rpy="0 0 0" />
+            <geometry>
+                <box size="0.025 10 2.0525" />
+            </geometry>
+            <material name="Stripe2" />
+        </visual>
+
+        <visual>
+            <origin xyz="6 0 -1.025" rpy="0 0 0" />
+            <geometry>
+                <box size="0.025 10 2.0525" />
+            </geometry>
+            <material name="Stripe2" />
+        </visual>
+
+        <visual>
+            <origin xyz="7 0 -1.025" rpy="0 0 0" />
+            <geometry>
+                <box size="0.025 10 2.0525" />
+            </geometry>
+            <material name="Stripe2" />
+        </visual>
+
+        <visual>
+            <origin xyz="8 0 -1.025" rpy="0 0 0" />
+            <geometry>
+                <box size="0.025 10 2.0525" />
+            </geometry>
+            <material name="Stripe2" />
+        </visual>
+
+        <visual>
+            <origin xyz="9 0 -1.025" rpy="0 0 0" />
+            <geometry>
+                <box size="0.025 10 2.0525" />
+            </geometry>
+            <material name="Stripe2" />
+        </visual>
+
+        <visual>
+            <origin xyz="10 0 -1.025" rpy="0 0 0" />
+            <geometry>
+                <box size="0.025 10 2.0525" />
+            </geometry>
+            <material name="Stripe2" />
+        </visual>
+
+
+
+        <visual>
+            <origin xyz="0 0 -1.025" rpy="0 0 0" />
+            <geometry>
+                <box size= "125 0.025 2.0525" />
+            </geometry>
+            <material name="Stripe2" />
+        </visual>
+
+        <visual>
+            <origin xyz="0 1 -1.025" rpy="0 0 0" />
+            <geometry>
+                <box size= "125 0.025 2.0525" />
+            </geometry>
+            <material name="Stripe2" />
+        </visual>
+
+        <visual>
+            <origin xyz="0 2 -1.025" rpy="0 0 0" />
+            <geometry>
+                <box size= "125 0.025 2.0525" />
+            </geometry>
+            <material name="Stripe2" />
+        </visual>
+
+        <visual>
+            <origin xyz="0 3 -1.025" rpy="0 0 0" />
+            <geometry>
+                <box size= "125 0.025 2.0525" />
+            </geometry>
+            <material name="Stripe2" />
+        </visual>
+
+        <visual>
+            <origin xyz="0 4 -1.025" rpy="0 0 0" />
+            <geometry>
+                <box size= "125 0.025 2.0525" />
+            </geometry>
+            <material name="Stripe2" />
+        </visual>
+
+        <visual>
+            <origin xyz="0 -1 -1.025" rpy="0 0 0" />
+            <geometry>
+                <box size= "125 0.025 2.0525" />
+            </geometry>
+            <material name="Stripe2" />
+        </visual>
+
+        <visual>
+            <origin xyz="0 -2 -1.025" rpy="0 0 0" />
+            <geometry>
+                <box size= "125 0.025 2.0525" />
+            </geometry>
+            <material name="Stripe2" />
+        </visual>
+
+        <visual>
+            <origin xyz="0 -3 -1.025" rpy="0 0 0" />
+            <geometry>
+                <box size= "125 0.025 2.0525" />
+            </geometry>
+            <material name="Stripe2" />
+        </visual>
+
+        <visual>
+            <origin xyz="0 -4 -1.025" rpy="0 0 0" />
+            <geometry>
+                <box size= "125 0.025 2.0525" />
+            </geometry>
+            <material name="Stripe2" />
+        </visual>
+
+
+    </link>
+    <joint name="ground_joint" type="fixed">
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <parent link="world" />
+        <child link="ground_link" />
+    </joint>
+
+
+</robot>

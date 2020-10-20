@@ -90,6 +90,56 @@
             </joint>
         </skeleton>
 
+        <skeleton name="obstacles">
+            <mobile>false</mobile>
+            <body name="obst">
+                <transformation>0 0.0 0 0 0.0 0.0</transformation>
+                <visualization_shape>
+                    <transformation>0.95 0.65 0 0 0 0</transformation>
+                    <geometry>
+                        <box>
+                            <size>1.2 1.5 0.1</size>
+                        </box>
+                    </geometry>
+                    <color>0.3 0.5 0.3 1</color>
+                </visualization_shape>
+
+                <collision_shape>
+                    <transformation>0.95 0.65 0 0 0 0</transformation>
+                    <geometry>
+                        <box>
+                            <size>1.2 1.5 0.1</size>
+                        </box>
+                    </geometry>
+                    <color>0.3 0.5 0.3 1</color>
+                </collision_shape>
+
+                <visualization_shape>
+                    <transformation>-0.95 0.65 0 0 0 0</transformation>
+                    <geometry>
+                        <box>
+                            <size>1.2 1.5 0.1</size>
+                        </box>
+                    </geometry>
+                    <color>0.3 0.5 0.3 1</color>
+                </visualization_shape>
+
+                <collision_shape>
+                    <transformation>-0.95 0.65 0 0 0 0</transformation>
+                    <geometry>
+                        <box>
+                            <size>1.2 1.5 0.1</size>
+                        </box>
+                    </geometry>
+                    <color>0.3 0.5 0.3 1</color>
+                </collision_shape>
+            </body>
+            <joint type="free" name="joint 1">
+                <parent>world</parent>
+                <child>obst</child>
+            </joint>
+        </skeleton>
+
         <skeleton name="pendulum">
             <transformation>0 -0.35 0 0 0 0</transformation>
             <body name="cart">

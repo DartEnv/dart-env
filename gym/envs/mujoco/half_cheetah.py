@@ -15,6 +15,8 @@ class HalfCheetahEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         self.learn_rear_walk = False  # learn to walk with rear legs only
         self.learn_lim_vel = None#2.0
 
+        self.test_mode = True
+
         self.learn_alternative_walk = False
 
         self.include_obs_history = 1
@@ -151,6 +153,10 @@ class HalfCheetahEnv(mujoco_env.MujocoEnv, utils.EzPickle):
     def reset_model(self):
         qpos = np.array(self.init_qpos)# + self.np_random.uniform(low=-.1, high=.1, size=self.model.nq)
         qvel = np.array(self.init_qvel)# + self.np_random.randn(self.model.nv) * .1
+
+        if not self.test_mode:
+            qpos += self.np_random.uniform(low=-.1, high=.1, size=self.model.nq)
+            qvel += self.np_random.randn(self.model.nv) * .1
 
         if self.learn_rear_walk:
             qpos[1] += 0.15

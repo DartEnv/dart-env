@@ -43,6 +43,8 @@ from gym.envs.dart.hopper_rss import DartHopperRSSEnv
 
 from gym.envs.dart.hexapod import DartHexapodEnv
 
+from gym.envs.dart.hopper_hybridcontrol import DartHopperHybridEnv
+
 from gym.envs.dart.hopper_1link import DartHopper1LinkEnv
 from gym.envs.dart.hopper_3link import DartHopper3LinkEnv
 from gym.envs.dart.hopper_4link import DartHopper4LinkEnv
@@ -97,3 +99,7 @@ from gym.envs.dart.ddp_env import DDPEnv
 
 from gym.envs.dart.cross_puzzle import DartCrossPuzzle
 from gym.envs.dart.bridge_puzzle import DartBridgePuzzle
+from gym.envs.dart.ball_circle import DartBallCircle
+
+from gym.envs.dart.A1 import DartA1Env
+from gym.envs.dart.franka_transport import DartFrankaTransportEnv

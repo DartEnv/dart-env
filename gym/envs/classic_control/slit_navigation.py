@@ -7,7 +7,7 @@ import sys
 class Slit_Navigation(gym.Env):
     def __init__(self,
                  init_cond=[0.0, 0.5],
-                 slit_width=0.01,
+                 slit_width=0.1,
                  slit_loc=[3.0, 0.0],
                  vx=1.0,
                  action_scale=2.0,
@@ -50,7 +50,7 @@ class Slit_Navigation(gym.Env):
         r = 0.0
         d = np.array([x, y]) - np.array(self.target_loc)
         if np.linalg.norm(d) < self.target_rad:
-            r = 100.0
+            r = 10.0
         return r
 
     def step(self, action):
@@ -68,7 +68,7 @@ class Slit_Navigation(gym.Env):
         reward = 0.0
         col = self.check_collision(x, y)
         if col:
-            reward = -0.1
+            reward = -1.0
         # stuck there! no dynamics
         else:
             x = x + self.vx * self.dt

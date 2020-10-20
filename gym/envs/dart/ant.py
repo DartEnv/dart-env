@@ -16,7 +16,7 @@ class DartAntEnv(dart_env.DartEnv, utils.EzPickle):
         self.noisy_input = False
         obs_dim = 27
 
-        self.training_mode = True
+        self.training_mode = False
 
         self.velrew_weight = 3.0
         self.resample_MP = False  # whether to resample the model paraeters
@@ -24,7 +24,13 @@ class DartAntEnv(dart_env.DartEnv, utils.EzPickle):
 
         self.random_direction = True
 
-        self.bridge_puzzle = True
+        self.bridge_puzzle = False
+
+        self.circle_puzzle = True
+        self.max_time = 15.0
+        self.current_time = 0.0
+        self.circle_radius = 6.0
+        self.desired_rot_rate = 2 * np.pi / self.max_time
 
         self.t = 0
 
@@ -37,6 +43,7 @@ class DartAntEnv(dart_env.DartEnv, utils.EzPickle):
 
         if self.random_direction:
             obs_dim += 2
+            self.action_scale = 250.0  # make ant stronger for easier learning
 
         obs_perm_base = np.array(
             [0.0001, -1, 2, -3, -4,   -7,8, -5,6, -11,12, -9,10, 13,14,-15,16,-17,-18, -21,22, -19,20, -25,26, -23,24])
@@ -55,7 +62,10 @@ class DartAntEnv(dart_env.DartEnv, utils.EzPickle):
             self.obs_perm = np.concatenate([self.obs_perm, np.arange(int(len(self.obs_perm)),
                                                 int(len(self.obs_perm)+len(self.param_manager.activated_param)))])
 
-        if self.bridge_puzzle:
+        if self.circle_puzzle:
+            dart_env.DartEnv.__init__(self, ['ball_circle_ant.skel'], 5, obs_dim, self.control_bounds,
+                                      disableViewer=True, dt=0.01)
+        elif self.bridge_puzzle:
             dart_env.DartEnv.__init__(self, ['bridge_puzzle_ant.skel'], 5, obs_dim, self.control_bounds, disableViewer=True, dt=0.01)
         else:
             dart_env.DartEnv.__init__(self, ['ant.skel'], 5, obs_dim, self.control_bounds,
@@ -162,6 +172,7 @@ class DartAntEnv(dart_env.DartEnv, utils.EzPickle):
 
         if self.random_direction:
             vel = (self.xyposafter - self.xyposbefore) / self.dt
+            print(np.linalg.norm(vel))
             reward = np.sum(self.goal_direction * vel) * self.velrew_weight
             reward -= np.linalg.norm(vel - np.sum(self.goal_direction * vel) * self.goal_direction) * self.velrew_weight * 0.3  # perpendicular component
 
@@ -203,6 +214,21 @@ class DartAntEnv(dart_env.DartEnv, utils.EzPickle):
                 if self.current_target_id >= len(self.targets):
                     self.current_target_id -= 1
                 self.dart_world.skeletons[-2].q = self.targets[self.current_target_id]
+
+        if self.circle_puzzle:
+            self.current_time += self.dt
+            elapsed_angle = self.desired_rot_rate * self.current_time
+            self.target = np.array(
+                [-np.sin(elapsed_angle) * self.circle_radius, np.cos(elapsed_angle) * self.circle_radius])
+            self.dart_world.skeletons[-2].q = np.array([self.target[0], 0.5, self.target[1]])
+            vec = np.array([self.target[0] - self.robot_skeleton.C[0], self.target[1] - self.robot_skeleton.C[2]])
+            reward_dist = - np.linalg.norm(vec) * 0.1
+            done = False
+            # if self.robot_skeleton.C[0] < -self.circle_radius * 0.6 or self.robot_skeleton.C[
+            #     0] > self.circle_radius * 0.6:
+            #     done = True
+            reward = reward_dist
+            done = done or (self.current_time > self.max_time)
 
         if self.training_mode:
             if np.linalg.norm(self.robot_skeleton.dC) < 1.0:
@@ -263,9 +289,13 @@ class DartAntEnv(dart_env.DartEnv, utils.EzPickle):
         self.zeroed_height = self.robot_skeleton.bodynodes[2].com()[1]
         init_q = np.array([0, -0.2, 0, 0,0,0, 0,-1, 0,-1, 0,1, 0,1])
         qpos = init_q + self.np_random.uniform(low=-.1, high=.1, size=self.robot_skeleton.ndofs)
-        # if self.training_mode:
-        #     qpos[4] = np.random.uniform(0, np.pi*2)
         qvel = self.robot_skeleton.dq + self.np_random.uniform(low=-.1, high=.1, size=self.robot_skeleton.ndofs)
+
+        if self.circle_puzzle:
+            qpos[2] += self.circle_radius
+            self.set_state(qpos, qvel)
+            self.target = np.array([0.0, self.circle_radius])
+            self.current_time = 0.0
 
         self.set_state(qpos, qvel)
         if self.resample_MP:
@@ -278,6 +308,7 @@ class DartAntEnv(dart_env.DartEnv, utils.EzPickle):
         if self.random_direction:
             angle = np.random.uniform(0, 2*np.pi)
             self.goal_direction = np.array([np.sin(angle), np.cos(angle)])
+            self.goal_direction = np.array([-1.0, 0.0])
 
         state = self._get_obs(update_buffer = True)
 
@@ -302,7 +333,7 @@ class DartAntEnv(dart_env.DartEnv, utils.EzPickle):
 
         if self.random_direction:
             self.track_skeleton_id = 0
-            self._get_viewer().scene.tb.trans[2] = -10.5
+            self._get_viewer().scene.tb.trans[2] = -20.5
             self._get_viewer().scene.tb._set_theta(-60)
 
 

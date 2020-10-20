@@ -11,6 +11,8 @@ class Walker2dEnv(mujoco_env.MujocoEnv, utils.EzPickle):
 
         self.relaxed_bound = True
 
+        self.test_mode = True
+
         obs_perm_base = np.array(
             [0.0001, 1, 5, 6, 7, 2, 3, 4, 8, 9, 10, 14, 15, 16, 11, 12, 13])
         act_perm_base = np.array([3, 4, 5, 0.0001, 1, 2])
@@ -134,6 +136,11 @@ class Walker2dEnv(mujoco_env.MujocoEnv, utils.EzPickle):
     def reset_model(self):
         qpos = np.array(self.init_qpos)# + self.np_random.uniform(low=-.005, high=.005, size=self.model.nq)
         qvel = np.array(self.init_qvel)# + self.np_random.uniform(low=-.005, high=.005, size=self.model.nv)
+
+        if not self.test_mode:
+            qpos += self.np_random.uniform(low=-.05, high=.05, size=self.model.nq)
+            qvel += self.np_random.uniform(low=-.05, high=.05, size=self.model.nv)
+
         if np.random.random() > 0.5:
             qpos[3] += 0.3
             qpos[6] -= 0.3
@@ -147,6 +154,7 @@ class Walker2dEnv(mujoco_env.MujocoEnv, utils.EzPickle):
             qpos,
             qvel
         )
+
 
         self.cur_step = 0
         self.total_reward = 0

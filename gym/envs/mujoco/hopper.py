@@ -18,6 +18,8 @@ class HopperEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         self.previous_pose = np.zeros(5)
         self.input_time = False
 
+        self.test_mode = True
+
         # self.obs_ranges = np.array([[0.6, 1.8], [-0.5, 0.5], ])
 
         self.randomize_history_input = False
@@ -48,7 +50,7 @@ class HopperEnv(mujoco_env.MujocoEnv, utils.EzPickle):
 
         mujoco_env.MujocoEnv.__init__(self, 'hopper.xml', 4)
 
-        self.param_manager.set_simulator_parameters([0.05])
+        self.param_manager.set_simulator_parameters([0.1])
 
         utils.EzPickle.__init__(self)
 
@@ -95,7 +97,7 @@ class HopperEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         s = self.state_vector()
         height, ang = self.sim.data.qpos[1:3]
         done = not (np.isfinite(s).all() and (np.abs(s[2:]) < 100).all() and
-                    (height > .7) and (abs(ang) < .4))
+                    (height > .7) and (abs(ang) < .8))
         if self.relaxed_bound:
             done = not (np.isfinite(s).all() and (np.abs(s[2:]) < 100).all() and
                         (height > .4) and (abs(ang) < 1.0))
@@ -135,6 +137,7 @@ class HopperEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         return reward
 
     def step(self, a):
+        # a = -np.copy(a)
         self.cur_step += 1
         self.pre_advance()
         self.advance(a)
@@ -153,7 +156,6 @@ class HopperEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         reward = self.reward_func(a)
 
         done = self.terminated()
-
         ob = self._get_obs()
         return ob, reward, done, {}
 
@@ -223,6 +225,12 @@ class HopperEnv(mujoco_env.MujocoEnv, utils.EzPickle):
     def reset_model(self):
         qpos = np.array(self.init_qpos)# + self.np_random.uniform(low=-.005, high=.005, size=self.model.nq)
         qvel = np.array(self.init_qvel)# + self.np_random.uniform(low=-.005, high=.005, size=self.model.nv)
+
+        if not self.test_mode:
+            qpos += self.np_random.uniform(low=-.05, high=.05, size=self.model.nq)
+            qvel += self.np_random.uniform(low=-.05, high=.05, size=self.model.nv)
+        # qvel[0] += 2.0
+        # qpos[2] = 0.1
         # print(qpos)
         # qpos[1] -= 0.5
         # qpos[2] = 1.0

@@ -8,15 +8,15 @@ class HopperRSSEnv(mujoco_env.MujocoEnv, utils.EzPickle):
         utils.EzPickle.__init__(self)
 
     def do_simulation(self, ctrl, n_frames):
-        self.model.data.ctrl = ctrl
+        self.sim.data.ctrl = ctrl
         for _ in range(n_frames):
             self.model.step()
-            self.model.data.ctrl = ctrl * 0
+            self.sim.data.ctrl = ctrl * 0
 
-    def _step(self, a):
-        posbefore = self.model.data.qpos[0, 0]
+    def step(self, a):
+        posbefore = self.sim.data.qpos[0]
         self.do_simulation(a, self.frame_skip)
-        posafter, height, ang = self.model.data.qpos[0:3, 0]
+        posafter, height, ang = self.sim.data.qpos[0:3, 0]
         alive_bonus = 1.0
         reward = (posafter - posbefore) / self.dt
         reward += alive_bonus
@@ -29,8 +29,8 @@ class HopperRSSEnv(mujoco_env.MujocoEnv, utils.EzPickle):
 
     def _get_obs(self):
         return np.concatenate([
-            self.model.data.qpos.flat[1:],
-            self.model.data.qvel.flat
+            self.sim.data.qpos.flat[1:],
+            self.sim.data.qvel.flat
         ])
 
     def reset_model(self):

@@ -13,11 +13,11 @@ class DartManipulator2dEnv(dart_env.DartEnv, utils.EzPickle):
             '''for n in s.bodynodes:
                 n.set_collidable(True)'''
 
-        self.current_task = 0 # 0: reaching, 1: push in close range, 2: push away
+        self.current_task = 1 # 0: reaching, 1: push in close range, 2: push away
 
         utils.EzPickle.__init__(self)
 
-    def _step(self, a):
+    def step(self, a):
         clamped_control = np.array(a)
         for i in range(len(clamped_control)):
             if clamped_control[i] > self.control_bounds[0][i]:

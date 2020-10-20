@@ -9,3 +9,6 @@ from gym.envs.classic_control.minicar_drive import MiniCarEnv
 from gym.envs.classic_control.lqr import LQREnv
 
 from gym.envs.classic_control.slit_navigation import Slit_Navigation
+
+from gym.envs.classic_control.point_mass import PointMassEnv
+

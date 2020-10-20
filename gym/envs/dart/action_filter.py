@@ -23,6 +23,7 @@ class ActionFilter:
         z = signal.lfilter_zi(self.filter[0], self.filter[1])
         self.z = [z * 0 for i in range(self.dim)]
 
-        for i in range(10):
-            for d in range(self.dim):
-                _, self.z[d] = signal.lfilter(self.filter[0], self.filter[1], [0.0 if init_a is None else init_a[d]], zi=self.z[d])
+        # MMHACK:
+        # for i in range(10):
+        #     for d in range(self.dim):
+        #         _, self.z[d] = signal.lfilter(self.filter[0], self.filter[1], [0.0 if init_a is None else init_a[d]], zi=self.z[d])

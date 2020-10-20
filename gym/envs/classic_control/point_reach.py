@@ -4,6 +4,7 @@ import gym
 from gym import spaces
 from gym.utils import seeding
 import numpy as np
+import copy
 
 logger = logging.getLogger(__name__)
 
@@ -26,9 +27,19 @@ class PointReachEnv(gym.Env):
 
         self.input_target = True
         self.train_UP = False
-        self.resample_MP = True
+        self.resample_MP = False
+
+        self.test_mode = False
+
+        self.alive_bonus = 0.0
+
+        self.draw_perception = True
+
+        self.draw_path = False
 
         self.resample_task_on_reset = False
+
+        self.current_mode = 'NORMAL'
 
         if not self.train_UP:
             self.observation_space = spaces.Box(np.array([-10, -10, -np.inf, -np.inf]), np.array([10, 10, np.inf, np.inf]))
@@ -40,7 +51,8 @@ class PointReachEnv(gym.Env):
         self.targets = [np.array([0.0, 10.0])]
 
         if self.input_target:
-            self.observation_space = spaces.Box(np.array([-10, -10, -np.inf, -np.inf, -10, -10, -10, -10]), np.array([10, 10, np.inf, np.inf, 10, 10, 10, 10]))
+            self.observation_space = spaces.Box(np.array([-np.inf, -np.inf, -10, -10, -10, -10, -10, -10]),
+                                                np.array([np.inf, np.inf, 10, 10, 10, 10, 10, 10]))
 
         self._seed()
         self.viewer = None
@@ -61,14 +73,25 @@ class PointReachEnv(gym.Env):
         self.zone_orders = ['FORBIDDEN', 'WARN', 'SAFE']
         self.safe_zones = [np.array([[-10.5, -10.5], [-10.5, 10.5], [10.5, 10.5], [10.5, -10.5]])]
         self.warn_zones = [np.array([[-10.5, -10.5], [-10.5, 10.5], [10.5, 10.5], [10.5, -10.5]])]
-        self.forbidden_zones = []
+        self.forbidden_zones = [np.array([[-10, -10.0], [-10, 10.0], [-9.5, 10.0], [-9.5, -10.0]]),
+                                np.array([[-10, -10.0], [-10, -9.5], [10, -9.5], [10, -10.0]]),
+                                np.array([[-10, 10.0], [-10, 9.5], [10, 9.5], [10, 10.0]]),
+                                np.array([[9.5, -10.0], [9.5, 10], [10, 10], [10, -10.0]])
+                                ]
         self.forbidden_spheres = [[np.array([-5.0, -4.0]), 1.0], [np.array([10.0, 8.0]), 0.8],
                                   [np.array([2.0, 4.5]), 1.5], [np.array([2.0, -2.0]), 2.0]]
         self.targets = [np.array([8.0, 8.0])]
 
         # perturb obstacle positions
+        # np.random.seed(15)
         # for sp in self.forbidden_spheres:
-        #     sp[0] += np.random.uniform(-1.0, 1.0, 2)
+        #     sp[0] += np.random.uniform(-1.5, 1.5, 2)
+        # self.forbidden_spheres[2][0][0] -= 1.5
+        # # self.forbidden_spheres[2][0][1] += 0.5
+        # self.forbidden_spheres[3][0][0] -= 0.05
+        # self.forbidden_spheres[3][0][1] -= 0.0
+
+        self.forbidden_spheres_original = copy.deepcopy(self.forbidden_spheres)
 
         # maze v1
         # self.safe_zones = [np.array([[-10.5, -10.5], [-10.5, 10.5], [10.5, 10.5], [10.5, -10.5]])]
@@ -91,16 +114,21 @@ class PointReachEnv(gym.Env):
     # whether inside forbidden sphere
     # return binary value and nearest point if not in collision
     def in_forbidden_spheres(self):
-        closest_vec = np.array([100, 100.0])
+        closest_vec = np.array([30, 30.0, 30.0, 30.0])
         for sph in self.forbidden_spheres:
             dist = np.linalg.norm(self.state[0:2] - sph[0])
             if dist < sph[1]:
-                return True, np.array([0, 0.0])
+                return True, np.array([0, 0.0, 0.0, 0.0])
             else:
-                if np.linalg.norm(closest_vec) > dist - sph[1]:
+                if np.linalg.norm(closest_vec[0:2]) > dist - sph[1]:
                     dir = sph[0] - self.state[0:2]
                     dir /= np.linalg.norm(dir)
-                    closest_vec = dir * (dist - sph[1])
+                    closest_vec[2:] = closest_vec[0:2]
+                    closest_vec[0:2] = dir * (dist - sph[1])
+                elif np.linalg.norm(closest_vec[2:]) > dist - sph[1]:
+                    dir = sph[0] - self.state[0:2]
+                    dir /= np.linalg.norm(dir)
+                    closest_vec[2:] = dir * (dist - sph[1])
         return False, closest_vec
 
 
@@ -132,12 +160,12 @@ class PointReachEnv(gym.Env):
 
     def resample_task(self):
         # A point on half circle above
-        radius = np.random.uniform(6.8, 7.0)
-        # angle = np.random.uniform(0.0, np.pi)
-        angle = np.random.choice(np.arange(0, np.pi/2.0+0.01, np.pi / 10.0))
-        # if np.random.random() < 0.05:
-        #     angle = - np.pi/2.0
-        self.targets = [np.array([np.sin(angle) * radius, np.cos(angle) * radius])]
+        # radius = np.random.uniform(6.8, 7.0)
+        # # angle = np.random.uniform(0.0, np.pi)
+        # angle = np.random.choice(np.arange(0, np.pi/2.0+0.01, np.pi / 10.0))
+        # # if np.random.random() < 0.05:
+        # #     angle = - np.pi/2.0
+        # self.targets = [np.array([np.sin(angle) * radius, np.cos(angle) * radius])]
 
         # MMHACK: vary target and mass
         # rand = np.random.random()
@@ -167,12 +195,14 @@ class PointReachEnv(gym.Env):
         #     self.targets = [np.array([0.0, -5.0])]
         #     self.forbidden_zones = [[np.array([4, 2]), np.array([-4, 1])]]
 
-        return [np.copy(self.targets), self.mass, np.copy(self.forbidden_zones)]
+        self.forbidden_spheres = copy.deepcopy(self.forbidden_spheres_original)
+        for sp in self.forbidden_spheres:
+            sp[0] += np.random.uniform(-1.5, 1.5, 2)
+
+        return [copy.deepcopy(self.forbidden_spheres)]
 
     def set_task(self, task_params):
-        self.targets = np.copy(task_params[0])
-        self.mass = task_params[1]
-        self.forbidden_zones = task_params[2]
+        self.forbidden_spheres = copy.deepcopy(task_params[0])
 
     def _seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
@@ -192,6 +222,11 @@ class PointReachEnv(gym.Env):
 
         rew_before = self.computer_rew()
 
+        if not self.test_mode:
+            self.wind = np.random.uniform(-0.1, 0.1, 2)
+
+        state_before = np.copy(self.state)
+
         self.state[2:] += action * self.dt / self.mass + self.wind
         self.state[2:] = np.clip(self.state[2:], -0.5, 0.5)
         self.state[0:2] += self.state[2:] * self.dt
@@ -199,7 +234,7 @@ class PointReachEnv(gym.Env):
 
         rew_after = self.computer_rew()
 
-        reward = rew_after - rew_before# - np.sum(np.abs(action)) * 1.0
+        reward = rew_after - rew_before + self.alive_bonus# - np.sum(np.abs(action)) * 1.0
 
         done = False
 
@@ -220,7 +255,7 @@ class PointReachEnv(gym.Env):
 
         self.current_action = np.copy(action)
 
-        obs = np.array(self.state)
+        obs = np.array(self.state[2:])
 
         if self.train_UP:
             obs = np.concatenate([obs, [self.mass]*1])
@@ -239,46 +274,28 @@ class PointReachEnv(gym.Env):
 
         self.closest_vec = closest_vec
 
+        self.cur_step += 1
+
+        self.paths.append([state_before, self.state, self.current_mode])
+
+        # for sp in self.forbidden_spheres:
+        #     sp[0] += np.array([-(self.cur_step * 1.0 % 40) / 39 + 0.5, (self.cur_step * 1.0 % 40) / 39 - 0.5]) * 0.4
+
         return obs, reward, done, {}
 
-    def reset(self):
-        if not self.randomize_initial_state:
-            self.state = self.np_random.uniform(low=-0.05, high=0.05, size=(4,)) * 0 + 0.0001
-        else:
-            self.state = self.np_random.uniform(low=-0.05, high=0.05, size=(4,))
-            self.state[0] = self.np_random.uniform(-0.5, 0.5)
-            self.state[1] = self.np_random.uniform(-0.5, 0.5)
-        self.state += self.init_pose
-
-        self.current_action = np.ones(2)
-
-        if self.resample_MP:
-            self.mass = np.random.uniform(self.mass_range[0], self.mass_range[1])
-
-        if self.resample_task_on_reset:
-            self.resample_task()
-
+    def _get_obs(self):
         if self.train_UP:
-            obs = np.concatenate([self.state, [self.mass]*1])
-            # obs = np.concatenate([self.state, [1.5]])
+            obs = np.concatenate([self.state, [self.mass] * 1])
         else:
-            obs = np.copy(self.state)
+            obs = np.copy(self.state[2:])
 
         if self.input_target:
-            obs = np.concatenate([obs, (self.targets[0] - self.state[0:2]) / 10.0])
+            obs = np.concatenate([obs, (self.targets[0] - self.state[0:2])])
 
         sphere_collide, closest_vec = self.in_forbidden_spheres()
         if self.input_target:
             obs = np.concatenate([obs, closest_vec])
-
-        self.vec = self.targets[0] - self.state[0:2]
-
-        self.closest_vec = closest_vec
-
         return obs
-
-    # def _get_obs(self):
-    #     return np.copy(self.state)
 
     def _draw_zones(self, zones, scale, offset, r, g, b):
         from gym.envs.classic_control import rendering
@@ -314,16 +331,16 @@ class PointReachEnv(gym.Env):
                 elif self.zone_orders[z] == 'FORBIDDEN':
                     self._draw_zones(self.forbidden_zones, scale, offset, 0.3, 0.3, 0.3)
 
-            agent = rendering.make_circle(radius=0.2*scale)
+            agent = rendering.make_circle(radius=0.5*scale)
             self.agent_transform = rendering.Transform(self.state[0:2] * scale + offset)
             agent.add_attr(self.agent_transform)
-            agent.set_color(0.5, 0.5, 1.0)
+            agent.set_color(0.25, 0.25, 1.0)
             self.viewer.add_geom(agent)
 
-            target1 = rendering.make_circle(radius=0.2*scale)
+            target1 = rendering.make_circle(radius=0.5*scale)
             self.target_transform = rendering.Transform(self.targets[0] * scale + offset)
             target1.add_attr(self.target_transform)
-            target1.set_color(0.5, 1.0, 0.5)
+            target1.set_color(1.0, 0.8, 0.25)
             self.viewer.add_geom(target1)
 
             self.sphere_obstacles = []
@@ -346,18 +363,85 @@ class PointReachEnv(gym.Env):
         new_target = self.targets[0] * scale + offset
         self.target_transform.set_translation(new_target[0], new_target[1])
 
-        # draw target vec
-        target_vec_end = (self.vec + self.state[0:2]) * scale + offset
-        self.viewer.draw_line(new_pos, target_vec_end)
+        if self.draw_perception:
+            # draw target vec
+            target_vec_end = (self.vec + self.state[0:2]) * scale + offset
+            line = self.viewer.draw_line(new_pos, target_vec_end)
+            line.attrs[1].stroke = 8
+            line.attrs[0].vec4 = (1.0, 0.6, 0.0, 1.0)
 
-        target_vec_end = (self.closest_vec + self.state[0:2]) * scale + offset
-        self.viewer.draw_line(new_pos, target_vec_end)
+            target_vec_end = (self.closest_vec[0:2] + self.state[0:2]) * scale + offset
+            line = self.viewer.draw_line(new_pos, target_vec_end)
+            line.attrs[1].stroke = 8
+            line.attrs[0].vec4 = (0.0, 0.9, 0.0, 1.0)
+
+            target_vec_end = (self.closest_vec[2:] + self.state[0:2]) * scale + offset
+            line = self.viewer.draw_line(new_pos, target_vec_end)
+            line.attrs[1].stroke = 8
+            line.attrs[0].vec4 = (0.0, 0.4, 0.0, 1.0)
+
+        if self.draw_path:
+            if len(self.paths) > 2:
+                for i in range(1, len(self.paths)):
+                    start = self.paths[i][0][0:2] * scale + offset
+                    end = self.paths[i][1][0:2] * scale + offset
+                    line = self.viewer.draw_line(start, end)
+                    line.attrs[1].stroke = 15
+                    if self.paths[i][2] == 'TASK':
+                        line.attrs[0].vec4 = (0.0, 1.0, 0.0, 1.0)
+                    elif self.paths[i][2] == 'SAFE':
+                        line.attrs[0].vec4 = (1.0, 0.0, 0.0, 1.0)
 
         for s in range(len(self.forbidden_spheres)):
             pos = self.forbidden_spheres[s][0] * scale + offset
             self.sphere_obstacles[s].set_translation(pos[0], pos[1])
 
+
         return self.viewer.render(return_rgb_array = mode=='rgb_array')
+
+    def reset(self):
+        if not self.randomize_initial_state or self.test_mode:
+            self.state = self.np_random.uniform(low=-0.05, high=0.05, size=(4,)) * 0 + 0.0001
+        else:
+            self.state = self.np_random.uniform(low=-0.01, high=0.01, size=(4,))
+            self.state[0] = self.np_random.uniform(-0.1, 0.1)
+            self.state[1] = self.np_random.uniform(-0.1, 0.1)
+        self.state += self.init_pose
+
+        # self.forbidden_spheres = copy.deepcopy(self.forbidden_spheres_original)
+
+        self.current_action = np.ones(2)
+
+        if self.resample_MP and not self.test_mode:
+            self.mass = np.random.uniform(self.mass_range[0], self.mass_range[1])
+
+        if self.resample_task_on_reset:
+            self.resample_task()
+
+        if self.train_UP:
+            obs = np.concatenate([self.state, [self.mass]*1])
+            # obs = np.concatenate([self.state, [1.5]])
+        else:
+            obs = np.copy(self.state[2:])
+
+        if self.input_target:
+            obs = np.concatenate([obs, (self.targets[0] - self.state[0:2])])
+
+        sphere_collide, closest_vec = self.in_forbidden_spheres()
+        if self.input_target:
+            obs = np.concatenate([obs, closest_vec])
+
+        self.vec = self.targets[0] - self.state[0:2]
+
+        self.closest_vec = closest_vec
+
+        self.cur_step = 0
+
+        self.current_mode = 'NORMAL'
+
+        self.paths = []
+
+        return obs
 
     def state_vector(self):
         return np.copy(self.state)
